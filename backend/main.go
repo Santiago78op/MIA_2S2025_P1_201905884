@@ -130,7 +130,7 @@ func main() {
 
 	// Rutas de API
 	api := router.PathPrefix("/api").Subrouter()
-	
+
 	// Endpoints
 	api.HandleFunc("/health", healthHandler).Methods("GET")
 	api.HandleFunc("/filesystems", getFileSystemsHandler).Methods("GET")
