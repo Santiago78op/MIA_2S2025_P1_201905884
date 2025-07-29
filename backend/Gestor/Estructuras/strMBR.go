@@ -143,4 +143,4 @@ func DeserializeMBR(data []byte) (*MBR, error) {
 		return nil, fmt.Errorf("error al deserializar MBR: %v", err)
 	}
 	return mbr, nil
-} 
+}
