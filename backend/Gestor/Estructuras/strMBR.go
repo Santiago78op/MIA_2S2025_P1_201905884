@@ -13,18 +13,21 @@ import (
 // MBR representa la estructura del Master Boot Record
 // Esta estructura deberá estar en el primer sector del disco
 // Nota: Para más detalles sobre la estructura MBR, leer la página 7 de la documentación.
+/*
+| Nombre             | Tipo   | Descripción                                         |
+|--------------------|--------|-----------------------------------------------------|
+| mbr_tamanio        | int64  | Tamaño total del disco en bytes                     |
+| mbr_fecha_creacion | int64  | Fecha y hora de creación del disco                  |
+| mbr_dsk_signature  | int64  | Número random, que identifica de forma única a cada disco |
+| dsk_fit            | char   | Tipo de ajuste de la partición. B (Best), F (First), W (Worst) |
+| mbr_partitions     | partition[4] | Estructura con información de las 4 particiones           |
+*/
 type MBR struct {
-	// Tamaño total del disco en bytes
-	MbrTamanio int64 `binary:"little"`
-	// Fecha y hora de creación del Disco
+	MbrTamanio       int64 `binary:"little"`
 	MbrFechaCreacion int64 `binary:"little"`
-	// Número  random, que identifica de forma única a cada disco
 	MbrDiskSignature int64 `binary:"little"`
-	// Tipo de ajuste de la partición, -> Tendrá los valores de
-	// B (Best), F (First) o W (Worst)
-	MbrFit byte
-	// Estructura con información de las particiones
-	MbrParticiones [4]Partition
+	MbrFit           byte  `binary:"little"`
+	MbrParticiones   [4]Partition
 }
 
 // Constantes para el tipo de ajuste de partición
@@ -59,56 +62,6 @@ func NewMBR(tamanio int64, fit byte) *MBR {
 		MbrFit:           fit,
 		MbrParticiones:   [4]Partition{},
 	}
-}
-
-// NewPartition crea una nueva partición
-func NewPartition(tipo byte, fit byte, start, size int64, name string) *Partition {
-	p := &Partition{
-		PartStatus: StatusActiva,
-		PartType:   tipo,
-		PartFit:    fit,
-		PartStart:  start,
-		PartSize:   size,
-	}
-	// Copiar nombre limitando a 16 bytes
-	nameBytes := []byte(name)
-	if len(nameBytes) > 16 {
-		nameBytes = nameBytes[:16]
-	}
-	copy(p.PartName[:], nameBytes)
-	return p
-}
-
-// GetParticionLibre encuentra la primera partición disponible
-func (m *MBR) GetParticionLibre() *Partition {
-	for i := range m.MbrParticiones {
-		if m.MbrParticiones[i].PartStatus == StatusInactiva {
-			return &m.MbrParticiones[i]
-		}
-	}
-	return nil
-}
-
-// ValidarFit verifica si el tipo de ajuste es válido
-func (m *MBR) ValidarFit() bool {
-	return m.MbrFit == PartitionFitBest || m.MbrFit == PartitionFitFirst || m.MbrFit == PartitionFitWorst
-}
-
-// GetName obtiene el nombre de la partición como string
-func (p *Partition) GetName() string {
-	nameBytes := p.PartName[:]
-	for i, b := range nameBytes {
-		if b == 0 {
-			nameBytes = nameBytes[:i]
-			break
-		}
-	}
-	return string(nameBytes)
-}
-
-// IsEmpty verifica si la partición está vacía
-func (p *Partition) IsEmpty() bool {
-	return p.PartStatus == StatusInactiva
 }
 
 // generateRandomSignature genera una firma única para el disco
