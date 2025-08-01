@@ -3,50 +3,50 @@
 ## 🎯 **Objetivo**
 Esta guía define todas las estructuras de datos necesarias para implementar un simulador de sistema de archivos EXT2 compatible con el proyecto MIA.
 
+### 📊 **Estado de Implementación**
+- ✅ **MBR (Master Boot Record)** - IMPLEMENTADO
+- ✅ **Partition (Partición)** - IMPLEMENTADO  
+- 🔄 **EBR (Extended Boot Record)** - EN DESARROLLO
+- 🔄 **SuperBloque** - PENDIENTE
+- 🔄 **Inodo** - PENDIENTE
+- 🔄 **Bloque de Datos** - PENDIENTE
+- 🔄 **Journaling** - PENDIENTE
+- 🔄 **Estructuras de Reportes** - PENDIENTE
+
 ---
 
 ## 📋 **Índice de Estructuras**
 
-1. [MBR (Master Boot Record)](#1-mbr-master-boot-record)
-2. [Partition (Partición)](#2-partition-partición)
-3. [EBR (Extended Boot Record)](#3-ebr-extended-boot-record)
-4. [SuperBloque](#4-superbloque)
-5. [Inodo](#5-inodo)
-6. [Bloque de Datos](#6-bloque-de-datos)
-7. [Journaling](#7-journaling)
-8. [Estructuras de Reportes](#8-estructuras-de-reportes)
+1. [MBR (Master Boot Record)](#1-mbr-master-boot-record) ✅
+2. [Partition (Partición)](#2-partition-partición) ✅
+3. [EBR (Extended Boot Record)](#3-ebr-extended-boot-record) 🔄
+4. [SuperBloque](#4-superbloque) 🔄
+5. [Inodo](#5-inodo) 🔄
+6. [Bloque de Datos](#6-bloque-de-datos) 🔄
+7. [Journaling](#7-journaling) 🔄
+8. [Estructuras de Reportes](#8-estructuras-de-reportes) 🔄
 
 ---
 
-## 1. MBR (Master Boot Record)
+## 1. MBR (Master Boot Record) ✅ **IMPLEMENTADO**
 
 ### 📝 **Descripción:**
 Estructura principal que debe estar en el **primer sector** (primeros 512 bytes) del disco. Contiene información del disco y tabla de particiones.
 
-### 🏗️ **Estructura:**
+### 🏗️ **Estructura Actual:** (`backend/struct/strMBR.go`)
 ```go
 package estructuras
 
-import (
-    "encoding/binary"
-    "fmt"
-    "time"
-    "unsafe"
-)
-
 // MBR representa la estructura del Master Boot Record
+// Esta estructura deberá estar en el primer sector del disco
 type MBR struct {
-    // Tamaño total del disco en bytes
-    MbrTamanio int64 `binary:"little"`
-    
-    // Fecha y hora de creación (timestamp Unix)
-    MbrFechaCreacion int64 `binary:"little"`
-    
-    // Número random único que identifica el disco
-    MbrDiskSignature int64 `binary:"little"`
-    
-    // Tipo de ajuste: 'B'=Best, 'F'=First, 'W'=Worst
-    MbrFit byte
+    MbrTamanio       int64        `binary:"little"` // Tamaño total del disco en bytes
+    MbrFechaCreacion int64        `binary:"little"` // Fecha y hora de creación (timestamp Unix)
+    MbrDiskSignature int64        `binary:"little"` // Número random único que identifica el disco
+    MbrFit           byte         `binary:"little"` // Tipo de ajuste: 'B'=Best, 'F'=First, 'W'=Worst
+    MbrParticiones   [4]Partition                   // Array de 4 particiones (primarias/extendidas)
+}
+```
     
     // Tabla de particiones (máximo 4)
     Particiones [4]Partition

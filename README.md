@@ -3,10 +3,12 @@
 ## 📋 **Resumen del Proyecto**
 
 Simulador de **sistema de archivos EXT2** con:
-- **Backend en Go (Golang)** - obligatorio
-- **Frontend en React + TypeScript** 
-- **Reportes con Graphviz**
-- **Documentación técnica completa**
+- **Backend en Go (Golang)** - obligatorio ✅ **IMPLEMENTADO**
+- **Frontend en React + TypeScript** ✅ **IMPLEMENTADO**
+- **WebSockets y SSE para logs en tiempo real** ✅ **IMPLEMENTADO**
+- **Sistema de comandos completo** 🔄 **EN DESARROLLO**
+- **Reportes con Graphviz** 🔄 **PENDIENTE**
+- **Documentación técnica completa** ✅ **ACTUALIZADA**
 
 **Fecha de entrega:** 7 de septiembre de 2025, 23:59 horas
 
@@ -14,24 +16,31 @@ Simulador de **sistema de archivos EXT2** con:
 
 ### En Windows (desarrollo)
 ```bash
-# Frontend
+# Backend
+cd backend
+go mod tidy
+go run main.go
+
+# Frontend (terminal separado)
 cd frontend
 npm install
 npm start
-
-# Backend  
-cd backend
-go run main.go
 ```
 
 ### En Pop!_OS/Linux (producción)
 ```bash
 # Clonar repositorio
-git clone https://github.com/tu-usuario/tu-repositorio.git
-cd tu-repositorio
+git clone https://github.com/Santiago78op/MIA_2S2025_P1_201905884.git
+cd MIA_2S2025_P1_201905884
 
 # Seguir instrucciones en README_POPOS.md
 ```
+
+### 🌐 **URLs de Acceso**
+- **Frontend:** http://localhost:3000
+- **Backend API:** http://localhost:8080
+- **WebSocket:** ws://localhost:8080/ws
+- **Health Check:** http://localhost:8080/api/health
 
 ---
 
@@ -44,60 +53,170 @@ cd tu-repositorio
 4. ✅ Reportes para validar funcionamiento
 5. ✅ Documentación completa
 
-### 🔧 **Comandos Obligatorios**
-- **Gestión de discos:** `mkdisk`, `rmdisk`, `fdisk`, `mount`
-- **Sistema de archivos:** `mkfs`, `login`, `logout`
-- **Usuarios y grupos:** `mkgrp`, `rmgrp`, `mkusr`, `rmusr`
-- **Archivos y carpetas:** `mkfile`, `mkdir`, `cat`
+### 🔧 **Comandos Implementados**
+
+#### ✅ **Gestión de discos:**
+- `mkdisk` - ✅ **IMPLEMENTADO** - Crear discos virtuales (.mia)
+- `rmdisk` - 🔄 **PENDIENTE** - Eliminar discos
+- `fdisk` - 🔄 **PENDIENTE** - Gestión de particiones  
+- `mount` - 🔄 **PENDIENTE** - Montar particiones
+
+#### 🔄 **Sistema de archivos:**
+- `mkfs` - 🔄 **PENDIENTE** - Formatear particiones con EXT2
+- `login` - 🔄 **PENDIENTE** - Iniciar sesión
+- `logout` - 🔄 **PENDIENTE** - Cerrar sesión
+
+#### 🔄 **Usuarios y grupos:**
+- `mkgrp` - 🔄 **PENDIENTE** - Crear grupos
+- `rmgrp` - 🔄 **PENDIENTE** - Eliminar grupos
+- `mkusr` - 🔄 **PENDIENTE** - Crear usuarios
+- `rmusr` - 🔄 **PENDIENTE** - Eliminar usuarios
+
+#### 🔄 **Archivos y carpetas:**
+- `mkfile` - 🔄 **PENDIENTE** - Crear archivos
+- `mkdir` - 🔄 **PENDIENTE** - Crear directorios
+- `cat` - 🔄 **PENDIENTE** - Mostrar contenido
+
+### 📡 **API Endpoints Disponibles**
+
+| Método | Endpoint | Descripción | Estado |
+|--------|----------|-------------|--------|
+| GET | `/api/health` | Estado del servidor | ✅ |
+| GET | `/api/filesystems` | Listar sistemas de archivos | ✅ |
+| POST | `/api/partition` | Crear partición | ✅ |
+| POST | `/api/execute` | Ejecutar comandos | ✅ |
+| GET | `/api/logs` | Obtener logs (polling) | ✅ |
+| GET | `/api/logs/stream` | Stream de logs (SSE) | ✅ |
+| GET | `/ws` | WebSocket para logs en tiempo real | ✅ |
 
 ---
 
-## 🗂️ **Arquitectura del Proyecto**
+## 🗂️ **Arquitectura del Proyecto (Actualizada)**
 
-### **Estructura Recomendada**
+### **Estructura Actual**
 ```
-MIA_2S2025_P1_[tu_carnet]/
+MIA_2S2025_P1_201905884/
 ├── backend/
-│   ├── main.go
-│   ├── Gestor/
-│   │   ├── Comandos/
-│   │   │   ├── adminDiscos/        # mkdisk, rmdisk, fdisk, mount
-│   │   │   ├── adminSistemaArchivos/ # mkfs, login, logout
-│   │   │   ├── adminUsuarios/       # mkgrp, rmgrp, mkusr, rmusr
-│   │   │   ├── adminArchivos/       # mkfile, mkdir, cat
-│   │   │   └── Rep/                 # reportes
-│   │   ├── Estructuras/
-│   │   │   ├── mbr.go
-│   │   │   ├── partitions.go
-│   │   │   └── SystemFileExt2/     # estructuras EXT2
-│   │   ├── Acciones/               # funciones auxiliares
-│   │   └── utils/                  # logger, utilidades
-├── frontend/
+│   ├── main.go                     # ✅ Servidor principal con WebSockets/SSE
+│   ├── go.mod                      # ✅ Dependencias Go
+│   ├── go.sum                      # ✅ Lock de dependencias
+│   ├── command/                    # ✅ Comandos del sistema
+│   │   └── disk/
+│   │       └── mkdisk.go          # ✅ Implementado
+│   ├── struct/                     # ✅ Estructuras de datos
+│   │   ├── strMBR.go              # ✅ Master Boot Record
+│   │   └── strPartition.go        # ✅ Estructuras de particiones
+│   ├── Utils/                      # ✅ Utilidades
+│   │   └── logger.go              # ✅ Logger con WebSocket/SSE
+│   ├── action/                     # 🔄 Acciones auxiliares
+│   └── logs/                       # ✅ Directorio de logs
+├── frontend/                       # ✅ React + TypeScript
 │   ├── src/
-│   │   ├── components/
-│   │   ├── services/
-│   │   └── App.js
-│   └── public/
-├── docs/
-│   ├── manual_tecnico.pdf
-│   └── manual_usuario.pdf
-└── README.md
+│   │   ├── components/             # ✅ Componentes React
+│   │   │   ├── CommandExecutor.tsx # ✅ Ejecutor de comandos
+│   │   │   ├── ConnectionStatus.tsx # ✅ Estado de conexión
+│   │   │   └── FileSystemList.tsx  # ✅ Lista de sistemas
+│   │   ├── services/               # ✅ Servicios API
+│   │   │   └── apiService.ts       # ✅ Cliente HTTP
+│   │   ├── hooks/                  # ✅ Hooks personalizados
+│   │   │   └── useApi.ts           # ✅ Hook para API
+│   │   └── App.tsx                 # ✅ Aplicación principal
+│   ├── package.json                # ✅ Dependencias Node
+│   └── public/                     # ✅ Archivos públicos
+├── docs/                           # ✅ Documentación
+│   └── ESTRUCTURAS_GUIA.md         # ✅ Guía de estructuras
+├── README.md                       # ✅ Este archivo
+├── INTEGRATION_STATUS.md           # ✅ Estado de integración
+├── docker-compose.yml              # ✅ Configuración Docker
+└── run-*.sh                        # ✅ Scripts de ejecución
 ```
 
 ---
 
-## 🚀 **Plan de Desarrollo por Sprints**
+## � **Documentación Completa**
 
-### **Sprint 1: Backend Básico (Semana 1)**
-#### Tareas:
-1. **Configurar proyecto Go**
-   ```bash
-   go mod init gestor-archivos
-   ```
+### **📋 Guías Principales:**
+- 📖 **[README.md](README.md)** - Este archivo (documentación principal)
+- 🗺️ **[ROADMAP.md](docs/ROADMAP.md)** - Cronograma y progreso del proyecto
+- ✅ **[INTEGRATION_STATUS.md](INTEGRATION_STATUS.md)** - Estado de integración Frontend-Backend
 
-2. **Implementar estructuras básicas**
-   - MBR (Master Boot Record)
-   - Particiones (Primaria, Extendida, Lógica)
+### **🔧 Documentación Técnica:**
+- 🛠️ **[COMANDOS_IMPLEMENTADOS.md](docs/COMANDOS_IMPLEMENTADOS.md)** - Comandos del sistema
+- 📚 **[ESTRUCTURAS_GUIA.md](docs/ESTRUCTURAS_GUIA.md)** - Estructuras de datos EXT2
+- 📡 **[API_ENDPOINTS.md](docs/API_ENDPOINTS.md)** - Documentación de API REST
+
+### **🚀 Guías de Instalación:**
+- 🐧 **[README_POPOS.md](README_POPOS.md)** - Instalación en Pop!_OS/Linux
+- 🔧 **[GITHUB_GUIDE.md](GITHUB_GUIDE.md)** - Configuración de GitHub
+
+---
+
+## 🧪 **Testing y Desarrollo**
+
+### **🔧 Comandos de Desarrollo:**
+```bash
+# Compilar backend
+cd backend && go build -o backend.exe .
+
+# Ejecutar tests
+cd backend && go test ./...
+
+# Ejecutar en modo desarrollo
+cd backend && go run main.go
+
+# Frontend en desarrollo
+cd frontend && npm run start
+```
+
+### **📊 Estado de Testing:**
+- ✅ **Backend:** Compilación exitosa
+- ✅ **API Endpoints:** Todos funcionales
+- ✅ **WebSockets/SSE:** Implementados y probados
+- ✅ **Frontend:** Conectado al backend
+- 🔄 **Comandos:** mkdisk probado, otros pendientes
+
+---
+
+## 🏆 **Características Destacadas**
+
+### **✨ Features Implementadas:**
+- 🔄 **Logs en Tiempo Real:** WebSockets + SSE
+- 🌐 **API REST Completa:** 7 endpoints funcionales
+- 📱 **Frontend Reactivo:** Componentes modernos en TypeScript
+- 🏗️ **Arquitectura Escalable:** Modular y bien documentada
+- 📊 **Sistema de Logging:** 4 niveles (INFO, WARNING, ERROR, SUCCESS)
+
+### **🔧 Tecnologías Utilizadas:**
+- **Backend:** Go 1.21 + Gorilla Mux + Gorilla WebSocket
+- **Frontend:** React 18 + TypeScript + Hooks personalizados
+- **Base de Datos:** Archivos binarios (.mia)
+- **Comunicación:** REST API + WebSockets + SSE
+- **Build:** Go Modules + npm
+
+---
+
+## 📞 **Soporte y Contacto**
+
+### **🐛 Reportar Issues:**
+1. Crear issue en GitHub con descripción detallada
+2. Incluir logs del backend/frontend
+3. Especificar pasos para reproducir
+
+### **💡 Contribuir:**
+1. Fork del repositorio
+2. Crear branch para feature/bugfix
+3. Pull request con descripción clara
+
+### **📧 Contacto:**
+- **Repositorio:** [Santiago78op/MIA_2S2025_P1_201905884](https://github.com/Santiago78op/MIA_2S2025_P1_201905884)
+- **Documentación:** Carpeta `/docs`
+
+---
+
+**📅 Última actualización:** 1 de agosto de 2025  
+**👨‍💻 Desarrollador:** Santiago78op  
+**📚 Curso:** MIA - Segundo Semestre 2025  
+**🎯 Proyecto:** Sistema de Archivos EXT2
    - EBR (Extended Boot Record)
 
 3. **Comandos básicos de disco**
