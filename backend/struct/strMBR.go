@@ -84,16 +84,9 @@ func generateRandomSignature() int64 {
 	return n.Int64()
 }
 
-// Asigna el valor a fit validando que se el paraemtro correcto
+// Asigna el valor a fit validando que se el paraemtro correcto asignando la constante
 func ValidateFit(fit string) byte {
-	validFits := map[string]byte{"BF": PartitionFitBest, "FF": PartitionFitFirst, "WF": PartitionFitWorst}
-	if fit == "" {
-		return PartitionFitFirst // Default to First Fit
-	}
-	if val, ok := validFits[fit]; ok {
-		return val
-	}
-	return PartitionFitFirst // Default to First Fit if invalid
+	// Validar el tipo de ajuste, PartitionFitBest, PartitionFitFirst o PartitionFitWorst
 }
 
 // SerializeMBR convierte MBR a bytes
