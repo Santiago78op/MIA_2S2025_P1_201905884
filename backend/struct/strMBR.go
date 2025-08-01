@@ -37,13 +37,6 @@ const (
 	PartitionFitWorst byte = 'W' // Peor ajuste
 )
 
-// Constantes para tipos de partición
-const (
-	PartPrimaria  byte = 'P'
-	PartExtendida byte = 'E'
-	PartLogica    byte = 'L'
-)
-
 // Constantes para estado
 const (
 	StatusInactiva byte = 0
@@ -64,6 +57,23 @@ func NewMBR(tamanio int64, fit byte) *MBR {
 	}
 }
 
+// WriteMBR escribe el MBR en el disco especificado
+func WriteMBR(path string, sizeInBytes int64, fit string) error {
+	// Crear un nuevo MBR
+	mbr := NewMBR(sizeInBytes, fit[0]) // Asumimos que fit es un string de un solo carácter
+	// Serializar el MBR
+	mbrData, err := SerializeMBR(mbr)
+	if err != nil {
+		return fmt.Errorf("error al serializar el MBR: %v", err)
+	}
+	// Escribir el MBR en el disco
+	err = WriteToDisk(path, mbrData)
+	if err != nil {
+		return fmt.Errorf("error al escribir el MBR en el disco: %v", err)
+	}
+	return nil
+}
+
 // generateRandomSignature genera una firma única para el disco
 func generateRandomSignature() int64 {
 	max := big.NewInt(1<<63 - 1)
@@ -72,6 +82,18 @@ func generateRandomSignature() int64 {
 		return time.Now().UnixNano()
 	}
 	return n.Int64()
+}
+
+// Asigna el valor a fit validando que se el paraemtro correcto
+func ValidateFit(fit string) byte {
+	validFits := map[string]byte{"BF": PartitionFitBest, "FF": PartitionFitFirst, "WF": PartitionFitWorst}
+	if fit == "" {
+		return PartitionFitFirst // Default to First Fit
+	}
+	if val, ok := validFits[fit]; ok {
+		return val
+	}
+	return PartitionFitFirst // Default to First Fit if invalid
 }
 
 // SerializeMBR convierte MBR a bytes

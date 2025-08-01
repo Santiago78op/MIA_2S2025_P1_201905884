@@ -178,9 +178,6 @@ func SSEHandler(w http.ResponseWriter, r *http.Request) {
 	// Crear un canal para esta conexión
 	messageChan := make(chan LogMessage, 10)
 
-	// Agregar el canal a una lista global (simplificado para este ejemplo)
-	// En una implementación más robusta, deberías manejar múltiples clientes SSE
-
 	// Enviar mensajes al cliente
 	for {
 		select {

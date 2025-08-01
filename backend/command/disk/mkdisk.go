@@ -7,9 +7,10 @@ package disk
  */
 
 import (
+	estructuras "backend/Struct"
 	utils "backend/Utils"
+	action "backend/action"
 	"fmt"
-	"os"
 )
 
 /*
@@ -62,24 +63,20 @@ func MkDisk(size int64, fit string, unit string, path string) error {
 		return fmt.Errorf("el parámetro -path es obligatorio")
 	}
 
-	// Crear el archivo del disco
-	file, err := os.Create(path)
-	if err != nil {
-		utils.LogError("MkDisk", fmt.Sprintf("Error al crear el archivo: %v", err))
-		return fmt.Errorf("error al crear el archivo: %v", err)
-	}
-	defer file.Close()
-
-	// Escribir ceros en el archivo hasta alcanzar el tamaño especificado
-	if _, err := file.Write(make([]byte, sizeInBytes)); err != nil {
-		utils.LogError("MkDisk", fmt.Sprintf("Error al escribir en el archivo: %v", err))
-		return fmt.Errorf("error al escribir en el archivo: %v", err)
-	}
-
 	// Crear el Disco con los parámetros especificados
+	disk := action.NewDisk(path, sizeInBytes)
+	if disk != nil {
+		utils.LogError("MkDisk", fmt.Sprintf("Error al crear el disco: %v", disk))
+		return fmt.Errorf("error al crear el disco: %v", disk)
+	}
 
-	// Logica del MBR
+	// Logica para escribir el MBR (Master Boot Record) al disco
+	mbrPartition := estructuras.WriteMBR(path, sizeInBytes, fit)
+	if mbrPartition != nil {
+		utils.LogError("MkDisk", fmt.Sprintf("Error al Escribir el MBR: %v", mbrPartition))
+		return fmt.Errorf("error al escribir el MBR: %v", mbrPartition)
+	}
 
-	utils.LogInfo("MkDisk", fmt.Sprintf("Disco creado con éxito en %s de tamaño %d bytes con ajuste %s", path, sizeInBytes, fit))
+	utils.LogSuccess("MkDisk", fmt.Sprintf("Disco creado con éxito en %s de tamaño %d bytes con ajuste %s", path, sizeInBytes, fit))
 	return nil
 }
