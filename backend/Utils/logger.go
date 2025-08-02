@@ -115,8 +115,8 @@ func logToFile(message string) {
 
 // openLogFile abre (o crea) el archivo de log de errores
 func openLogFile() (*os.File, error) {
-	// Crear el directorio si no existe
-	logDir := "backend/logs"
+	// Crear el directorio si no existe - usar ruta absoluta
+	logDir := "./logs"
 	if err := os.MkdirAll(logDir, os.ModePerm); err != nil {
 		return nil, err
 	}
@@ -150,8 +150,7 @@ func LogError(comando, mensaje string) {
 func LogSuccess(comando, mensaje string) {
 	logger := NewLogger(SUCCESS, comando, mensaje)
 	logger.Log()
-	sendToFrontend(*logger) // Enviar éxito al frontend
-	logToFile(fmt.Sprintf("SUCCESS: %s - %s", comando, mensaje))
+	sendToFrontend(*logger)
 }
 
 // sendToFrontend envía un mensaje de registro al frontend a través de WebSocket
@@ -196,7 +195,7 @@ func SSEHandler(w http.ResponseWriter, r *http.Request) {
 // GetLogsHandler maneja las peticiones HTTP para obtener logs (polling)
 func GetLogsHandler(w http.ResponseWriter, r *http.Request) {
 	// Leer los logs del archivo (implementación básica)
-	logFile := "backend/logs/error.log"
+	logFile := "./logs/error.log"
 
 	// Verificar si el archivo existe
 	if _, err := os.Stat(logFile); os.IsNotExist(err) {

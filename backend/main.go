@@ -2,10 +2,12 @@ package main
 
 import (
 	utils "backend/Utils"
+	"backend/command"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -24,6 +26,7 @@ type HealthResponse struct {
 	Status    string    `json:"status"`
 	Timestamp time.Time `json:"timestamp"`
 	Version   string    `json:"version"`
+	Uptime    string    `json:"uptime"`
 }
 
 type FileSystemInfo struct {
@@ -31,39 +34,69 @@ type FileSystemInfo struct {
 	Type       string `json:"type"`
 	Size       int64  `json:"size"`
 	MountPoint string `json:"mountPoint"`
+	Status     string `json:"status"`
 }
+
+type ExecuteRequest struct {
+	Command string `json:"command"`
+	Script  string `json:"script,omitempty"`
+}
+
+type ExecuteResponse struct {
+	Results []command.CommandResult `json:"results"`
+	Summary ExecuteSummary          `json:"summary"`
+}
+
+type ExecuteSummary struct {
+	TotalCommands      int    `json:"total_commands"`
+	SuccessfulCommands int    `json:"successful_commands"`
+	FailedCommands     int    `json:"failed_commands"`
+	ExecutionTime      string `json:"execution_time"`
+}
+
+// Variables globales
+var (
+	startTime     = time.Now()
+	commandParser = command.NewCommandParser()
+)
 
 // Handlers
 func healthHandler(w http.ResponseWriter, r *http.Request) {
+	uptime := time.Since(startTime).Round(time.Second)
+
 	response := HealthResponse{
 		Status:    "OK",
 		Timestamp: time.Now(),
 		Version:   "1.0.0",
+		Uptime:    uptime.String(),
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(ApiResponse{
-		Message: "Backend funcionando correctamente",
+		Message: "Backend del sistema de archivos ExtreamFS funcionando correctamente",
 		Data:    response,
 		Status:  "success",
 	})
 }
 
-// getFileSystemsHandler obtiene información de los sistemas de archivos
+// getFileSystemsHandler obtiene información de los sistemas de archivos montados
 func getFileSystemsHandler(w http.ResponseWriter, r *http.Request) {
-	// Datos de ejemplo (luego se conectará con la lógica real)
+	// Por ahora devolvemos datos de ejemplo
+	// TODO: Implementar lógica real para obtener sistemas montados
 	fileSystems := []FileSystemInfo{
 		{
-			Name:       "disk1.dk",
+			Name:       "disk1.mia",
 			Type:       "EXT2",
-			Size:       1024000,
-			MountPoint: "/mnt/disk1",
+			Size:       1048576, // 1MB en bytes
+			MountPoint: "/mnt/341A",
+			Status:     "mounted",
 		},
 		{
-			Name:       "disk2.dk",
-			Type:       "EXT3",
-			Size:       2048000,
-			MountPoint: "/mnt/disk2",
+			Name:       "disk2.mia",
+			Type:       "EXT2",
+			Size:       2097152, // 2MB en bytes
+			MountPoint: "/mnt/341B",
+			Status:     "unmounted",
 		},
 	}
 
@@ -75,59 +108,156 @@ func getFileSystemsHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func createPartitionHandler(w http.ResponseWriter, r *http.Request) {
+// validateCommandHandler valida la sintaxis de un comando sin ejecutarlo
+func validateCommandHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
 		http.Error(w, "Método no permitido", http.StatusMethodNotAllowed)
 		return
 	}
 
-	var requestData map[string]interface{}
+	var requestData ExecuteRequest
 	if err := json.NewDecoder(r.Body).Decode(&requestData); err != nil {
 		http.Error(w, "JSON inválido", http.StatusBadRequest)
 		return
 	}
 
-	// Aquí iría la lógica para crear partición
-	log.Printf("Creando partición: %+v", requestData)
+	var errors []string
+	var validCommands []string
+
+	if requestData.Command != "" {
+		// Validar comando único
+		if err := commandParser.ValidateCommand(requestData.Command); err != nil {
+			errors = append(errors, err.Error())
+		} else {
+			validCommands = append(validCommands, requestData.Command)
+		}
+	}
+
+	if requestData.Script != "" {
+		// Validar script línea por línea
+		lines := strings.Split(requestData.Script, "\n")
+		for i, line := range lines {
+			line = strings.TrimSpace(line)
+			if line == "" || strings.HasPrefix(line, "#") {
+				continue
+			}
+
+			if err := commandParser.ValidateCommand(line); err != nil {
+				errors = append(errors, fmt.Sprintf("Línea %d: %s", i+1, err.Error()))
+			} else {
+				validCommands = append(validCommands, line)
+			}
+		}
+	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(ApiResponse{
-		Message: "Partición creada exitosamente",
-		Data:    requestData,
-		Status:  "success",
-	})
+
+	if len(errors) > 0 {
+		json.NewEncoder(w).Encode(ApiResponse{
+			Message: "Se encontraron errores de validación",
+			Data: map[string]interface{}{
+				"errors":         errors,
+				"valid_commands": validCommands,
+			},
+			Status: "error",
+		})
+	} else {
+		json.NewEncoder(w).Encode(ApiResponse{
+			Message: "Todos los comandos son válidos",
+			Data: map[string]interface{}{
+				"valid_commands": validCommands,
+			},
+			Status: "success",
+		})
+	}
 }
 
+// executeCommandHandler ejecuta uno o más comandos
 func executeCommandHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
 		http.Error(w, "Método no permitido", http.StatusMethodNotAllowed)
 		return
 	}
 
-	var requestData struct {
-		Command string `json:"command"`
-	}
-
+	var requestData ExecuteRequest
 	if err := json.NewDecoder(r.Body).Decode(&requestData); err != nil {
 		http.Error(w, "JSON inválido", http.StatusBadRequest)
 		return
 	}
 
-	// Enviar log de información al frontend
-	utils.LogInfo("EXECUTE", fmt.Sprintf("Ejecutando comando: %s", requestData.Command))
+	startExecution := time.Now()
+	var results []command.CommandResult
 
-	// Aquí iría la lógica para ejecutar comandos
-	log.Printf("Ejecutando comando: %s", requestData.Command)
+	if requestData.Command != "" && requestData.Script != "" {
+		// No permitir ambos al mismo tiempo
+		http.Error(w, "Debe especificar solo 'command' o 'script', no ambos", http.StatusBadRequest)
+		return
+	}
 
-	// Simular resultado del comando y enviar log de éxito
-	utils.LogSuccess("EXECUTE", fmt.Sprintf("Comando '%s' ejecutado exitosamente", requestData.Command))
+	if requestData.Command != "" {
+		// Ejecutar comando único
+		utils.LogInfo("API", fmt.Sprintf("Ejecutando comando único: %s", requestData.Command))
+		result := commandParser.ParseAndExecute(requestData.Command)
+		results = append(results, *result)
+	} else if requestData.Script != "" {
+		// Ejecutar script
+		utils.LogInfo("API", "Ejecutando script con múltiples comandos")
+		scriptResults := commandParser.ExecuteScript(requestData.Script)
+		for _, result := range scriptResults {
+			results = append(results, *result)
+		}
+	} else {
+		http.Error(w, "Debe especificar 'command' o 'script'", http.StatusBadRequest)
+		return
+	}
+
+	executionTime := time.Since(startExecution)
+
+	// Calcular estadísticas
+	successful := 0
+	failed := 0
+	for _, result := range results {
+		if result.Success {
+			successful++
+		} else {
+			failed++
+		}
+	}
+
+	summary := ExecuteSummary{
+		TotalCommands:      len(results),
+		SuccessfulCommands: successful,
+		FailedCommands:     failed,
+		ExecutionTime:      executionTime.String(),
+	}
+
+	response := ExecuteResponse{
+		Results: results,
+		Summary: summary,
+	}
+
+	// Log del resumen
+	utils.LogInfo("API", fmt.Sprintf("Ejecución completada: %d comandos (%d exitosos, %d fallidos) en %v",
+		summary.TotalCommands, summary.SuccessfulCommands, summary.FailedCommands, executionTime))
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(ApiResponse{
-		Message: "Comando ejecutado",
-		Data: map[string]string{
-			"command": requestData.Command,
-			"result":  "Comando ejecutado exitosamente",
+		Message: fmt.Sprintf("Ejecutados %d comandos", len(results)),
+		Data:    response,
+		Status:  "success",
+	})
+}
+
+// getSupportedCommandsHandler retorna la lista de comandos soportados
+func getSupportedCommandsHandler(w http.ResponseWriter, r *http.Request) {
+	commands := commandParser.GetSupportedCommands()
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(ApiResponse{
+		Message: "Comandos soportados",
+		Data: map[string]interface{}{
+			"commands": commands,
+			"total":    len(commands),
 		},
 		Status: "success",
 	})
@@ -148,10 +278,31 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 	utils.AddWSConnection(conn)
 	defer utils.RemoveWSConnection(conn)
 
-	// Mantener la conexión viva
+	// Enviar mensaje de bienvenida
+	welcome := utils.LogMessage{
+		Type:    utils.INFO,
+		Command: "SYSTEM",
+		Message: "Conexión WebSocket establecida para logs en tiempo real",
+		Time:    fmt.Sprintf("%d", time.Now().Unix()),
+	}
+	conn.WriteJSON(welcome)
+
+	// Mantener la conexión viva y manejar mensajes del cliente
 	for {
-		if _, _, err := conn.ReadMessage(); err != nil {
+		var msg map[string]interface{}
+		err := conn.ReadJSON(&msg)
+		if err != nil {
+			log.Println("Error reading WebSocket message:", err)
 			break
+		}
+
+		// Procesar mensajes del cliente si es necesario
+		if msgType, ok := msg["type"].(string); ok && msgType == "ping" {
+			pong := map[string]interface{}{
+				"type":      "pong",
+				"timestamp": time.Now().Unix(),
+			}
+			conn.WriteJSON(pong)
 		}
 	}
 }
@@ -163,10 +314,13 @@ func main() {
 	// Rutas de API
 	api := router.PathPrefix("/api").Subrouter()
 
-	// Endpoints de API
+	// Endpoints básicos
 	api.HandleFunc("/health", healthHandler).Methods("GET")
 	api.HandleFunc("/filesystems", getFileSystemsHandler).Methods("GET")
-	api.HandleFunc("/partition", createPartitionHandler).Methods("POST")
+	api.HandleFunc("/commands", getSupportedCommandsHandler).Methods("GET")
+
+	// Endpoints para comandos
+	api.HandleFunc("/validate", validateCommandHandler).Methods("POST")
 	api.HandleFunc("/execute", executeCommandHandler).Methods("POST")
 
 	// Endpoints para logs y comunicación en tiempo real
@@ -176,7 +330,7 @@ func main() {
 
 	// Configurar CORS
 	c := cors.New(cors.Options{
-		AllowedOrigins:   []string{"http://localhost:3000", "http://127.0.0.1:3000"},
+		AllowedOrigins:   []string{"http://localhost:3000", "http://127.0.0.1:3000", "*"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"*"},
 		AllowCredentials: true,
@@ -187,15 +341,49 @@ func main() {
 
 	// Configurar servidor
 	port := ":8080"
+
+	// Mensaje de inicio
+	fmt.Println("🚀 ====================================")
+	fmt.Println("🚀    ExtreamFS Backend Server")
+	fmt.Println("🚀 ====================================")
 	fmt.Printf("🚀 Servidor iniciado en http://localhost%s\n", port)
+	fmt.Println("🚀 Proyecto: Simulador de Sistema de Archivos EXT2")
+	fmt.Println("🚀 Versión: 1.0.0")
+	fmt.Println("🚀")
 	fmt.Println("📡 Endpoints disponibles:")
 	fmt.Println("   GET  /api/health         - Estado del servidor")
 	fmt.Println("   GET  /api/filesystems    - Listar sistemas de archivos")
-	fmt.Println("   POST /api/partition       - Crear partición")
-	fmt.Println("   POST /api/execute         - Ejecutar comando")
-	fmt.Println("   GET  /api/logs            - Obtener logs (polling)")
-	fmt.Println("   GET  /api/logs/stream     - Stream de logs (SSE)")
-	fmt.Println("   GET  /ws                  - WebSocket para logs en tiempo real")
+	fmt.Println("   GET  /api/commands       - Comandos soportados")
+	fmt.Println("   POST /api/validate       - Validar sintaxis de comandos")
+	fmt.Println("   POST /api/execute        - Ejecutar comandos")
+	fmt.Println("   GET  /api/logs           - Obtener logs (polling)")
+	fmt.Println("   GET  /api/logs/stream    - Stream de logs (SSE)")
+	fmt.Println("   GET  /ws                 - WebSocket para logs en tiempo real")
+	fmt.Println("🚀")
+	fmt.Println("📝 Comandos implementados:")
+
+	commands := commandParser.GetSupportedCommands()
+	for i, cmd := range commands {
+		if i < 6 { // Mostrar solo los primeros comandos implementados
+			status := "✅"
+			if cmd == "mkdisk" || cmd == "rmdisk" {
+				status = "✅ IMPLEMENTADO"
+			} else {
+				status = "🚧 EN DESARROLLO"
+			}
+			fmt.Printf("   %-12s %s\n", cmd, status)
+		}
+	}
+	fmt.Printf("   %-12s %s\n", "...", fmt.Sprintf("y %d comandos más", len(commands)-6))
+
+	fmt.Println("🚀")
+	fmt.Println("🔧 Para probar el sistema:")
+	fmt.Println("   curl http://localhost:8080/api/health")
+	fmt.Println("🚀 ====================================")
+
+	// Log inicial
+	utils.LogSuccess("SYSTEM", "ExtreamFS Backend iniciado correctamente")
+	utils.LogInfo("SYSTEM", fmt.Sprintf("Servidor escuchando en puerto %s", port))
 
 	// Iniciar servidor
 	log.Fatal(http.ListenAndServe(port, handler))

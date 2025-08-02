@@ -48,27 +48,11 @@ lerna-debug.log*
 # ===========================================
 # IDES Y EDITORES
 # ===========================================
-# VS Code - configuraciones locales específicas del usuario
-.vscode/settings.json
-.vscode/launch.json
-.vscode/tasks.json
-.vscode/.ropeproject
-
-# Mantener configuraciones compartidas del proyecto
-!.vscode/extensions.json
-!.vscode/c_cpp_properties.json
-
-# IntelliJ IDEA
+.vscode/
 .idea/
-*.iws
-*.iml
-*.ipr
-
-# Vim/Emacs
 *.swp
 *.swo
 *~
-.#*
 
 # ===========================================
 # SISTEMAS OPERATIVOS
@@ -142,31 +126,6 @@ reports/
 # ===========================================
 config/local.json
 *.local.json
-
-# ===========================================
-# ARCHIVOS DE FUENTES Y RECURSOS GRANDES
-# ===========================================
-# Archivos de fuentes (ligatures)
-*.zip
-*.tar.gz
-*.rar
-*.7z
-CascadiaCode-*.zip
-JetBrainsMono-*.zip
-FiraCode-*.zip
-
-# Archivos de instalación
-*.deb
-*.rpm
-*.msi
-*.dmg
-
-# Archivos multimedia grandes
-*.mp4
-*.avi
-*.mov
-*.mkv
-*.iso
 
 # ===========================================
 # DOCKER

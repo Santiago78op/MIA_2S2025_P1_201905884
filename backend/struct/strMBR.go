@@ -177,6 +177,162 @@ func (m *MBR) ValidarFit() bool {
 	return m.MbrFit == PartitionFitBest || m.MbrFit == PartitionFitFirst || m.MbrFit == PartitionFitWorst
 }
 
+// GetParticionLibre encuentra la primera partición disponible en el MBR
+func (m *MBR) GetParticionLibre() *Partition {
+	for i := range m.MbrParticiones {
+		if m.MbrParticiones[i].PartStatus == StatusInactiva {
+			return &m.MbrParticiones[i]
+		}
+	}
+	return nil
+}
+
+// GetParticionByName busca una partición por nombre
+func (m *MBR) GetParticionByName(name string) *Partition {
+	for i := range m.MbrParticiones {
+		if m.MbrParticiones[i].GetName() == name && m.MbrParticiones[i].PartStatus == StatusActiva {
+			return &m.MbrParticiones[i]
+		}
+	}
+	return nil
+}
+
+// HasExtendedPartition verifica si ya existe una partición extendida
+func (m *MBR) HasExtendedPartition() bool {
+	for i := range m.MbrParticiones {
+		if m.MbrParticiones[i].PartStatus == StatusActiva &&
+			m.MbrParticiones[i].PartType == PartitionTypeExtendida {
+			return true
+		}
+	}
+	return false
+}
+
+// CountActivePartitions cuenta las particiones activas (primarias y extendidas)
+func (m *MBR) CountActivePartitions() int {
+	count := 0
+	for i := range m.MbrParticiones {
+		if m.MbrParticiones[i].PartStatus == StatusActiva &&
+			(m.MbrParticiones[i].PartType == PartitionTypePrimaria ||
+				m.MbrParticiones[i].PartType == PartitionTypeExtendida) {
+			count++
+		}
+	}
+	return count
+}
+
+// GetFreeSpace calcula el espacio libre disponible en el disco
+func (m *MBR) GetFreeSpace() int64 {
+	usedSpace := int64(MBR_SIZE) // Espacio usado por el MBR
+
+	for i := range m.MbrParticiones {
+		if m.MbrParticiones[i].PartStatus == StatusActiva {
+			usedSpace += m.MbrParticiones[i].PartSize
+		}
+	}
+
+	return m.MbrTamanio - usedSpace
+}
+
+// FindBestFitPosition encuentra la mejor posición para una nueva partición según el algoritmo especificado
+func (m *MBR) FindBestFitPosition(size int64) (int64, error) {
+	// Crear lista de espacios libres
+	freeSpaces := m.getFreeSpaces()
+
+	if len(freeSpaces) == 0 {
+		return -1, fmt.Errorf("no hay espacios libres disponibles")
+	}
+
+	switch m.MbrFit {
+	case PartitionFitFirst: // First Fit
+		for _, space := range freeSpaces {
+			if space.Size >= size {
+				return space.Start, nil
+			}
+		}
+	case PartitionFitBest: // Best Fit
+		bestSpace := FreeSpace{Size: m.MbrTamanio + 1} // Inicializar con tamaño imposible
+		found := false
+		for _, space := range freeSpaces {
+			if space.Size >= size && space.Size < bestSpace.Size {
+				bestSpace = space
+				found = true
+			}
+		}
+		if found {
+			return bestSpace.Start, nil
+		}
+	case PartitionFitWorst: // Worst Fit
+		worstSpace := FreeSpace{Size: -1} // Inicializar con tamaño inválido
+		for _, space := range freeSpaces {
+			if space.Size >= size && space.Size > worstSpace.Size {
+				worstSpace = space
+			}
+		}
+		if worstSpace.Size >= size {
+			return worstSpace.Start, nil
+		}
+	}
+
+	return -1, fmt.Errorf("no se encontró espacio suficiente para la partición")
+}
+
+// FreeSpace representa un espacio libre en el disco
+type FreeSpace struct {
+	Start int64
+	Size  int64
+}
+
+// getFreeSpaces obtiene todos los espacios libres en el disco
+func (m *MBR) getFreeSpaces() []FreeSpace {
+	var spaces []FreeSpace
+	var occupiedSpaces []FreeSpace
+
+	// Agregar el espacio ocupado por el MBR
+	occupiedSpaces = append(occupiedSpaces, FreeSpace{Start: 0, Size: int64(MBR_SIZE)})
+
+	// Agregar espacios ocupados por particiones activas
+	for i := range m.MbrParticiones {
+		if m.MbrParticiones[i].PartStatus == StatusActiva {
+			occupiedSpaces = append(occupiedSpaces, FreeSpace{
+				Start: m.MbrParticiones[i].PartStart,
+				Size:  m.MbrParticiones[i].PartSize,
+			})
+		}
+	}
+
+	// Ordenar espacios ocupados por posición de inicio
+	for i := 0; i < len(occupiedSpaces)-1; i++ {
+		for j := i + 1; j < len(occupiedSpaces); j++ {
+			if occupiedSpaces[i].Start > occupiedSpaces[j].Start {
+				occupiedSpaces[i], occupiedSpaces[j] = occupiedSpaces[j], occupiedSpaces[i]
+			}
+		}
+	}
+
+	// Encontrar espacios libres entre espacios ocupados
+	currentPos := int64(0)
+	for _, occupied := range occupiedSpaces {
+		if currentPos < occupied.Start {
+			spaces = append(spaces, FreeSpace{
+				Start: currentPos,
+				Size:  occupied.Start - currentPos,
+			})
+		}
+		currentPos = occupied.Start + occupied.Size
+	}
+
+	// Verificar si hay espacio libre al final del disco
+	if currentPos < m.MbrTamanio {
+		spaces = append(spaces, FreeSpace{
+			Start: currentPos,
+			Size:  m.MbrTamanio - currentPos,
+		})
+	}
+
+	return spaces
+}
+
 // WriteToDisk escribe datos en el disco en la posición especificada
 func WriteToDisk(path string, data []byte, offset int64) error {
 	// Abrir el archivo del disco
