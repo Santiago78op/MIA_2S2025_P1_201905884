@@ -15,69 +15,62 @@ part_correlative  | int        | Indica el correlativo de la partición, inicial
 part_id           | char[4]    | Indica el ID de la partición generada al montar esta partición
 */
 type Partition struct {
-	PartStatus      byte     `binary:"little"`
-	PartType        byte     `binary:"little"`
-	PartFit         byte     `binary:"little"`
-	PartStart       int64    `binary:"little"`
-	PartSize        int64    `binary:"little"`
-	PartName        [16]byte `binary:"little"`
-	PartCorrelativo int64    `binary:"little"`
-	PartID          int64    `binary:"little"`
+	PartStatus      byte     `binary:"little"` // Indica si la partición está montada o no
+	PartType        byte     `binary:"little"` // Tipo de partición: P (Primaria), E (Extendida), L (Lógica)
+	PartFit         byte     `binary:"little"` // Tipo de ajuste: B (Best), F (First), W (Worst)
+	PartStart       int64    `binary:"little"` // Byte donde inicia la partición
+	PartSize        int64    `binary:"little"` // Tamaño total de la partición en bytes
+	PartName        [16]byte `binary:"little"` // Nombre de la partición (máximo 16 caracteres)
+	PartCorrelativo int64    `binary:"little"` // Correlativo de la partición (-1 hasta que sea montada)
+	PartID          [4]byte  `binary:"little"` // ID de la partición generada al montar
 }
 
 // NewPartition crea una nueva partición con valores iniciales
 func NewPartition(tipo byte, fit byte, start, size int64, name string) *Partition {
-
-}
-
-/*
-// NewPartition crea una nueva partición
-func NewPartition(tipo byte, fit byte, start, size int64, name string) *Partition {
 	p := &Partition{
-		PartStatus: StatusActiva,
-		PartType:   tipo,
-		PartFit:    fit,
-		PartStart:  start,
-		PartSize:   size,
+		PartStatus:      StatusActiva,
+		PartType:        tipo,
+		PartFit:         fit,
+		PartStart:       start,
+		PartSize:        size,
+		PartCorrelativo: -1, // Inicialmente -1 hasta que sea montada
 	}
+
 	// Copiar nombre limitando a 16 bytes
 	nameBytes := []byte(name)
 	if len(nameBytes) > 16 {
 		nameBytes = nameBytes[:16]
 	}
 	copy(p.PartName[:], nameBytes)
+
+	// Inicializar PartID como vacío
+	for i := range p.PartID {
+		p.PartID[i] = 0
+	}
+
 	return p
 }
 
-// GetParticionLibre encuentra la primera partición disponible
-func (m *MBR) GetParticionLibre() *Partition {
-	for i := range m.MbrParticiones {
-		if m.MbrParticiones[i].PartStatus == StatusInactiva {
-			return &m.MbrParticiones[i]
-		}
+// NewEmptyPartition crea una partición vacía/inactiva
+func NewEmptyPartition() *Partition {
+	p := &Partition{
+		PartStatus:      StatusInactiva,
+		PartType:        0,
+		PartFit:         0,
+		PartStart:       0,
+		PartSize:        0,
+		PartCorrelativo: -1,
 	}
-	return nil
-}
 
-// ValidarFit verifica si el tipo de ajuste es válido
-func (m *MBR) ValidarFit() bool {
-	return m.MbrFit == PartitionFitBest || m.MbrFit == PartitionFitFirst || m.MbrFit == PartitionFitWorst
-}
-
-// GetName obtiene el nombre de la partición como string
-func (p *Partition) GetName() string {
-	nameBytes := p.PartName[:]
-	for i, b := range nameBytes {
-		if b == 0 {
-			nameBytes = nameBytes[:i]
-			break
-		}
+	// Limpiar nombre
+	for i := range p.PartName {
+		p.PartName[i] = 0
 	}
-	return string(nameBytes)
-}
 
-// IsEmpty verifica si la partición está vacía
-func (p *Partition) IsEmpty() bool {
-	return p.PartStatus == StatusInactiva
+	// Limpiar ID
+	for i := range p.PartID {
+		p.PartID[i] = 0
+	}
+
+	return p
 }
-*/

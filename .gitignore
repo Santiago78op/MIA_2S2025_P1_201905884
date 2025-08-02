@@ -1,43 +1,83 @@
-# Dependencias
+# ===========================================
+# DEPENDENCIAS DE NODE.JS / REACT
+# ===========================================
 node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
 
-# Archivos de producción
+# ===========================================
+# ARCHIVOS DE PRODUCCIÓN / BUILD
+# ===========================================
 build/
 dist/
+coverage/
 
-# Variables de entorno
+# ===========================================
+# VARIABLES DE ENTORNO
+# ===========================================
 .env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
 
-# Logs
-logs
+# ===========================================
+# LOGS
+# ===========================================
+logs/
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
 
-# Cache
+# ===========================================
+# CACHE
+# ===========================================
 .npm
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnp.*
 .eslintcache
+.stylelintcache
 
-# IDEs
+# ===========================================
+# IDES Y EDITORES
+# ===========================================
 .vscode/
 .idea/
 *.swp
 *.swo
+*~
 
-# OS
+# ===========================================
+# SISTEMAS OPERATIVOS
+# ===========================================
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
+desktop.ini
 
-# Archivos temporales
+# ===========================================
+# ARCHIVOS TEMPORALES
+# ===========================================
 *.tmp
 *.temp
+*~
+.#*
 
-# Backend Go específico
+# ===========================================
+# BACKEND GO ESPECÍFICO
+# ===========================================
+# Binarios compilados
 *.exe
 *.exe~
 *.dll
@@ -46,7 +86,56 @@ Thumbs.db
 *.test
 *.out
 go.work
+go.work.sum
 
-# Binarios
-bin/
+# Binarios y ejecutables del proyecto
+main
+backend/main
+backend/*.exe
+
+# Vendor y dependencias
 vendor/
+bin/
+
+# ===========================================
+# ARCHIVOS DEL SIMULADOR EXT2
+# ===========================================
+# Archivos de disco virtuales
+*.dsk
+*.disk
+*.vdisk
+*.img
+
+# Archivos de particiones simuladas
+*.part
+*.partition
+
+# Reportes generados
+reports/
+*.html
+*.png
+*.svg
+*.pdf
+
+# Archivos de respaldo del sistema de archivos
+*.backup
+*.bak
+
+# ===========================================
+# ARCHIVOS DE CONFIGURACIÓN LOCAL
+# ===========================================
+config/local.json
+*.local.json
+
+# ===========================================
+# DOCKER
+# ===========================================
+.dockerignore
+docker-compose.override.yml
+
+# ===========================================
+# TESTING
+# ===========================================
+.nyc_output
+coverage/
+*.lcov
