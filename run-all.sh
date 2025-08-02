@@ -12,7 +12,7 @@ trap cleanup SIGINT SIGTERM
 
 # Iniciar backend en segundo plano
 echo "⚙️ Iniciando backend..."
-cd backend && go run main.go &
+(cd backend && go run main.go) &
 BACKEND_PID=$!
 
 # Esperar un poco para que el backend inicie
@@ -20,7 +20,7 @@ sleep 3
 
 # Iniciar frontend en segundo plano
 echo "🌐 Iniciando frontend..."
-cd ../frontend && npm start &
+(cd frontend && npm start) &
 FRONTEND_PID=$!
 
 echo "✅ Servicios iniciados:"
