@@ -1,0 +1,3 @@
+{
+    "command": "mkdisk -size=5 -unit=M -path=\"./Discos/mis discos/disco.mia\""
+}
