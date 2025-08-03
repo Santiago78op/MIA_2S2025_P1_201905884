@@ -4,7 +4,6 @@ import (
 	utils "backend/Utils"
 	diskCommands "backend/command/disk"
 	"fmt"
-	"regexp"
 	"strconv"
 	"strings"
 )
@@ -76,24 +75,56 @@ func (cp *CommandParser) ParseAndExecute(commandLine string) *CommandResult {
 	return cp.executeCommand(command, params)
 }
 
-// parseCommandLine divide la línea de comando en partes, respetando comillas
+// parseCommandLine divide la línea de comando en partes, respetando comillas y parámetros
 func (cp *CommandParser) parseCommandLine(commandLine string) ([]string, error) {
-	// Regex para dividir respetando comillas
-	re := regexp.MustCompile(`[^\s"']+|"([^"]*)"|'([^']*)'`)
-	matches := re.FindAllStringSubmatch(commandLine, -1)
-
 	var parts []string
-	for _, match := range matches {
-		if match[1] != "" {
-			// Contenido entre comillas dobles
-			parts = append(parts, match[1])
-		} else if match[2] != "" {
-			// Contenido entre comillas simples
-			parts = append(parts, match[2])
-		} else {
-			// Contenido sin comillas
-			parts = append(parts, match[0])
+	var current strings.Builder
+	inQuotes := false
+	quoteChar := byte(0)
+
+	for i := 0; i < len(commandLine); i++ {
+		char := commandLine[i]
+
+		switch char {
+		case '"', '\'':
+			if !inQuotes {
+				// Comenzar comillas
+				inQuotes = true
+				quoteChar = char
+				// No agregar la comilla al resultado
+			} else if char == quoteChar {
+				// Terminar comillas
+				inQuotes = false
+				quoteChar = 0
+				// No agregar la comilla al resultado
+			} else {
+				// Comilla diferente dentro de comillas
+				current.WriteByte(char)
+			}
+		case ' ', '\t':
+			if inQuotes {
+				// Espacio dentro de comillas
+				current.WriteByte(char)
+			} else {
+				// Espacio fuera de comillas - separador
+				if current.Len() > 0 {
+					parts = append(parts, current.String())
+					current.Reset()
+				}
+			}
+		default:
+			current.WriteByte(char)
 		}
+	}
+
+	// Agregar la última parte
+	if current.Len() > 0 {
+		parts = append(parts, current.String())
+	}
+
+	// Verificar comillas balanceadas
+	if inQuotes {
+		return nil, fmt.Errorf("comillas no balanceadas")
 	}
 
 	return parts, nil
@@ -103,7 +134,45 @@ func (cp *CommandParser) parseCommandLine(commandLine string) ([]string, error) 
 func (cp *CommandParser) parseParameters(paramParts []string) (map[string]string, error) {
 	params := make(map[string]string)
 
+	// Reconstruir los parámetros que pueden haber sido divididos por espacios
+	var reconstructedParts []string
+	var currentParam strings.Builder
+	inParameterValue := false
+
 	for _, part := range paramParts {
+		if strings.HasPrefix(part, "-") && strings.Contains(part, "=") {
+			// Nuevo parámetro encontrado
+			if currentParam.Len() > 0 {
+				reconstructedParts = append(reconstructedParts, currentParam.String())
+				currentParam.Reset()
+			}
+			currentParam.WriteString(part)
+			inParameterValue = true
+		} else if strings.HasPrefix(part, "-") && !strings.Contains(part, "=") {
+			// Parámetro flag (sin valor)
+			if currentParam.Len() > 0 {
+				reconstructedParts = append(reconstructedParts, currentParam.String())
+				currentParam.Reset()
+			}
+			reconstructedParts = append(reconstructedParts, part)
+			inParameterValue = false
+		} else if inParameterValue {
+			// Continuación del valor del parámetro anterior (debido a espacios)
+			currentParam.WriteString(" ")
+			currentParam.WriteString(part)
+		} else {
+			// Parte sin prefijo - y no estamos en un valor de parámetro
+			return nil, fmt.Errorf("parámetro inválido: %s (debe comenzar con -)", part)
+		}
+	}
+
+	// Agregar el último parámetro si existe
+	if currentParam.Len() > 0 {
+		reconstructedParts = append(reconstructedParts, currentParam.String())
+	}
+
+	// Ahora parsear los parámetros reconstruidos
+	for _, part := range reconstructedParts {
 		if !strings.HasPrefix(part, "-") {
 			return nil, fmt.Errorf("parámetro inválido: %s (debe comenzar con -)", part)
 		}
@@ -119,6 +188,8 @@ func (cp *CommandParser) parseParameters(paramParts []string) (map[string]string
 		} else {
 			paramName := part[:equalIndex]
 			paramValue := part[equalIndex+1:]
+			// Decodificar espacios que fueron codificados como %20
+			paramValue = strings.ReplaceAll(paramValue, "%20", " ")
 			params[paramName] = paramValue
 		}
 	}
