@@ -184,13 +184,17 @@ func CleanDisk(path string) error {
 	originalSignature := mbr.MbrDiskSignature
 	originalFit := mbr.MbrFit
 
-	// Crear nuevo MBR limpio
+	// Crear nuevo MBR limpio conservando la firma original
 	cleanMBR := NewMBR(originalSize, originalFit)
 	cleanMBR.MbrDiskSignature = originalSignature // Mantener la firma original
 
-	// Escribir el MBR limpio
-	err = WriteMBR(path, originalSize, string(originalFit))
+	// Serializar y escribir el MBR limpio para no generar una nueva firma
+	mbrData, err := SerializeMBR(cleanMBR)
 	if err != nil {
+		return fmt.Errorf("error al serializar MBR limpio: %v", err)
+	}
+
+	if err = WriteToDisk(path, mbrData, 0); err != nil {
 		return fmt.Errorf("error al escribir MBR limpio: %v", err)
 	}
 
