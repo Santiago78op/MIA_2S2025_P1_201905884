@@ -1,4 +1,9 @@
 # 🗺️ Roadmap de Desarrollo - Sistema de Archivos EXT2
+## 🆕 Cambios recientes (agosto 2025)
+- Fase 1: Gestión de discos y particiones en desarrollo.
+- Estructura EBR y sistema de montaje en progreso.
+- Roadmap actualizado con fechas y prioridades semanales.
+- Riesgos y mitigaciones documentados.
 
 ## 📅 **Cronograma General**
 

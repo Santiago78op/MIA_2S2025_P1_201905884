@@ -210,6 +210,8 @@ func (cp *CommandParser) executeCommand(command string, params map[string]string
 		return cp.executeMount(params)
 	case "unmount":
 		return cp.executeUnmount(params)
+	case "mounted":
+		return cp.executeMounted(params)
 	case "mkfs":
 		return cp.executeMkfs(params)
 	default:
@@ -305,30 +307,195 @@ func (cp *CommandParser) executeRmDisk(params map[string]string) *CommandResult 
 	}
 }
 
-// executeFdisk ejecuta el comando fdisk (placeholder por ahora)
+// executeFdisk ejecuta el comando fdisk
 func (cp *CommandParser) executeFdisk(params map[string]string) *CommandResult {
-	utils.LogWarning("Parser", "Comando FDISK aún no implementado")
+	// Validar parámetros obligatorios
+	sizeStr, hasSizeParam := params["size"]
+	path, hasPath := params["path"]
+	name, hasName := params["name"]
+
+	if !hasSizeParam {
+		return &CommandResult{
+			Success: false,
+			Error:   "El parámetro -size es obligatorio",
+		}
+	}
+
+	if !hasPath {
+		return &CommandResult{
+			Success: false,
+			Error:   "El parámetro -path es obligatorio",
+		}
+	}
+
+	if !hasName {
+		return &CommandResult{
+			Success: false,
+			Error:   "El parámetro -name es obligatorio",
+		}
+	}
+
+	// Convertir size a número
+	size, err := strconv.ParseInt(sizeStr, 10, 64)
+	if err != nil {
+		return &CommandResult{
+			Success: false,
+			Error:   fmt.Sprintf("El valor de -size debe ser un número válido: %v", err),
+		}
+	}
+
+	// Parámetros opcionales
+	unit := params["unit"]
+	partType := params["type"]
+	fit := params["fit"]
+
+	// Ejecutar el comando
+	err = diskCommands.Fdisk(size, unit, path, partType, fit, name)
+	if err != nil {
+		return &CommandResult{
+			Success: false,
+			Error:   err.Error(),
+		}
+	}
+
 	return &CommandResult{
-		Success: false,
-		Error:   "Comando FDISK no implementado aún",
+		Success: true,
+		Message: fmt.Sprintf("Partición '%s' creada exitosamente en %s", name, path),
+		Data: map[string]interface{}{
+			"name": name,
+			"path": path,
+			"size": size,
+			"unit": unit,
+			"type": partType,
+			"fit":  fit,
+		},
 	}
 }
 
-// executeMount ejecuta el comando mount (placeholder por ahora)
+// executeMount ejecuta el comando mount
 func (cp *CommandParser) executeMount(params map[string]string) *CommandResult {
-	utils.LogWarning("Parser", "Comando MOUNT aún no implementado")
+	// Validar parámetros obligatorios
+	path, hasPath := params["path"]
+	name, hasName := params["name"]
+
+	if !hasPath {
+		return &CommandResult{
+			Success: false,
+			Error:   "El parámetro -path es obligatorio",
+		}
+	}
+
+	if !hasName {
+		return &CommandResult{
+			Success: false,
+			Error:   "El parámetro -name es obligatorio",
+		}
+	}
+
+	// Ejecutar el comando
+	err := diskCommands.Mount(path, name)
+	if err != nil {
+		return &CommandResult{
+			Success: false,
+			Error:   err.Error(),
+		}
+	}
+
+	// Obtener información de la partición montada
+	mountedPartitions := diskCommands.GetMountedPartitions()
+	var mountedPartition *diskCommands.MountedPartition
+
+	// Buscar la partición recién montada
+	for _, partition := range mountedPartitions {
+		if partition.Path == path && partition.Name == name {
+			mountedPartition = partition
+			break
+		}
+	}
+
+	var partitionData map[string]interface{}
+	if mountedPartition != nil {
+		partitionData = map[string]interface{}{
+			"id":          mountedPartition.ID,
+			"name":        mountedPartition.Name,
+			"path":        mountedPartition.Path,
+			"type":        mountedPartition.Type,
+			"size":        mountedPartition.Size,
+			"correlative": mountedPartition.Correlative,
+		}
+	}
+
 	return &CommandResult{
-		Success: false,
-		Error:   "Comando MOUNT no implementado aún",
+		Success: true,
+		Message: fmt.Sprintf("Partición '%s' montada exitosamente con ID %s", name, mountedPartition.ID),
+		Data: map[string]interface{}{
+			"path":      path,
+			"name":      name,
+			"partition": partitionData,
+		},
 	}
 }
 
-// executeUnmount ejecuta el comando unmount (placeholder por ahora)
+// executeUnmount ejecuta el comando unmount
 func (cp *CommandParser) executeUnmount(params map[string]string) *CommandResult {
-	utils.LogWarning("Parser", "Comando UNMOUNT aún no implementado")
+	// Validar parámetros obligatorios
+	id, hasID := params["id"]
+
+	if !hasID {
+		return &CommandResult{
+			Success: false,
+			Error:   "El parámetro -id es obligatorio",
+		}
+	}
+
+	// Obtener información antes de desmontar
+	mountedPartition, err := diskCommands.GetMountedPartitionByID(id)
+	if err != nil {
+		return &CommandResult{
+			Success: false,
+			Error:   fmt.Sprintf("Partición no encontrada: %v", err),
+		}
+	}
+
+	// Ejecutar el comando
+	err = diskCommands.Unmount(id)
+	if err != nil {
+		return &CommandResult{
+			Success: false,
+			Error:   err.Error(),
+		}
+	}
+
 	return &CommandResult{
-		Success: false,
-		Error:   "Comando UNMOUNT no implementado aún",
+		Success: true,
+		Message: fmt.Sprintf("Partición %s (%s) desmontada exitosamente", id, mountedPartition.Name),
+		Data: map[string]interface{}{
+			"id":   id,
+			"name": mountedPartition.Name,
+			"path": mountedPartition.Path,
+		},
+	}
+}
+
+// executeMounted ejecuta el comando mounted
+func (cp *CommandParser) executeMounted(params map[string]string) *CommandResult {
+	// Este comando no requiere parámetros
+	mountedPartitions := diskCommands.GetMountedPartitions()
+
+	// Generar el mensaje de salida
+	output := diskCommands.ShowMountedPartitions()
+
+	// Obtener estadísticas del sistema
+	stats := diskCommands.GetMountSystemStats()
+
+	return &CommandResult{
+		Success: true,
+		Message: output,
+		Data: map[string]interface{}{
+			"mounted_partitions": mountedPartitions,
+			"system_stats":       stats,
+			"total_count":        len(mountedPartitions),
+		},
 	}
 }
 
@@ -429,6 +596,7 @@ func (cp *CommandParser) GetSupportedCommands() []string {
 		"fdisk",   // Administrar particiones
 		"mount",   // Montar partición
 		"unmount", // Desmontar partición
+		"mounted", // Listar particiones montadas
 		"mkfs",    // Formatear partición
 		"login",   // Iniciar sesión
 		"logout",  // Cerrar sesión

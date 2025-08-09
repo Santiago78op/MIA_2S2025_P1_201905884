@@ -3,10 +3,15 @@ package main
 import (
 	utils "backend/Utils"
 	"backend/command"
+	diskCommands "backend/command/disk"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -14,6 +19,42 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/rs/cors"
 )
+
+// ConfigureCarnet configura el sufijo del carnet para generar IDs de particiones
+func ConfigureCarnet() {
+	// Intentar obtener el carnet de argumentos de línea de comandos
+	carnet := flag.String("carnet", "", "Número de carnet completo (ej: 202401234)")
+	flag.Parse()
+
+	var suffix string
+
+	if *carnet != "" {
+		// Extraer últimos dos dígitos del carnet
+		if len(*carnet) >= 2 {
+			suffix = (*carnet)[len(*carnet)-2:]
+		}
+	} else {
+		// Intentar obtener de variable de entorno
+		carnetEnv := os.Getenv("STUDENT_CARNET")
+		if carnetEnv != "" && len(carnetEnv) >= 2 {
+			suffix = carnetEnv[len(carnetEnv)-2:]
+		}
+	}
+
+	// Validar que sean dígitos
+	if suffix != "" {
+		matched, _ := regexp.MatchString(`^\d{2}$`, suffix)
+		if matched {
+			diskCommands.SetCarnetSuffix(suffix)
+			fmt.Printf("✅ Carnet configurado: IDs de partición usarán el sufijo '%s'\n", suffix)
+		} else {
+			fmt.Printf("⚠️  Carnet inválido, usando sufijo por defecto '34'\n")
+		}
+	} else {
+		fmt.Printf("ℹ️  No se especificó carnet, usando sufijo por defecto '34'\n")
+		fmt.Printf("   Para configurar: -carnet=202401234 o export STUDENT_CARNET=202401234\n")
+	}
+}
 
 // Estructuras de respuesta
 type ApiResponse struct {
@@ -35,6 +76,7 @@ type FileSystemInfo struct {
 	Size       int64  `json:"size"`
 	MountPoint string `json:"mountPoint"`
 	Status     string `json:"status"`
+	Path       string `json:"path"`
 }
 
 type ExecuteRequest struct {
@@ -81,28 +123,104 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 
 // getFileSystemsHandler obtiene información de los sistemas de archivos montados
 func getFileSystemsHandler(w http.ResponseWriter, r *http.Request) {
-	// Por ahora devolvemos datos de ejemplo
-	// TODO: Implementar lógica real para obtener sistemas montados
-	fileSystems := []FileSystemInfo{
-		{
-			Name:       "disk1.mia",
-			Type:       "EXT2",
-			Size:       1048576, // 1MB en bytes
-			MountPoint: "/mnt/341A",
-			Status:     "mounted",
-		},
-		{
-			Name:       "disk2.mia",
-			Type:       "EXT2",
-			Size:       2097152, // 2MB en bytes
-			MountPoint: "/mnt/341B",
-			Status:     "unmounted",
-		},
+	// Obtener parámetro de ruta de la query string
+	searchPath := r.URL.Query().Get("path")
+	if searchPath == "" {
+		searchPath = "./Discos" // Ruta por defecto
+	}
+
+	// Limpiar y expandir la ruta
+	searchPath = strings.TrimSpace(searchPath)
+
+	// Convertir rutas relativas a absolutas si es necesario
+	if strings.HasPrefix(searchPath, "~/") {
+		homeDir, err := os.UserHomeDir()
+		if err == nil {
+			searchPath = filepath.Join(homeDir, searchPath[2:])
+		}
+	}
+
+	// Limpiar la ruta
+	searchPath = filepath.Clean(searchPath)
+
+	var fileSystems []FileSystemInfo
+
+	// Verificar si el directorio existe
+	if _, err := os.Stat(searchPath); os.IsNotExist(err) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(ApiResponse{
+			Message: fmt.Sprintf("Directorio no encontrado: %s", searchPath),
+			Data:    []FileSystemInfo{},
+			Status:  "warning",
+		})
+		return
+	}
+
+	// Buscar archivos .mia del directorio especificado
+	pattern := filepath.Join(searchPath, "*.mia")
+	files, err := filepath.Glob(pattern)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(ApiResponse{
+			Message: fmt.Sprintf("Error buscando archivos .mia: %v", err),
+			Data:    []FileSystemInfo{},
+			Status:  "error",
+		})
+		return
+	}
+
+	// También buscar archivos .dsk
+	dskPattern := filepath.Join(searchPath, "*.dsk")
+	dskFiles, err := filepath.Glob(dskPattern)
+	if err == nil {
+		files = append(files, dskFiles...)
+	}
+
+	// Búsqueda manual adicional si Glob falla
+	if len(files) == 0 {
+		entries, err := os.ReadDir(searchPath)
+		if err == nil {
+			for _, entry := range entries {
+				if !entry.IsDir() {
+					name := entry.Name()
+					if strings.HasSuffix(strings.ToLower(name), ".mia") || strings.HasSuffix(strings.ToLower(name), ".dsk") {
+						fullPath := filepath.Join(searchPath, name)
+						files = append(files, fullPath)
+					}
+				}
+			}
+		}
+	}
+
+	for _, file := range files {
+		if stat, err := os.Stat(file); err == nil {
+			fileName := filepath.Base(file)
+			fileExt := strings.ToLower(filepath.Ext(fileName))
+
+			// Determinar tipo por extensión
+			diskType := "EXT2"
+			if fileExt == ".dsk" {
+				diskType = "DSK"
+			}
+
+			// Determinar si está montado
+			status := "unmounted"
+			mountPoint := ""
+
+			fileSystems = append(fileSystems, FileSystemInfo{
+				Name:       fileName,
+				Type:       diskType,
+				Size:       stat.Size(),
+				MountPoint: mountPoint,
+				Status:     status,
+				Path:       file,
+			})
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(ApiResponse{
-		Message: "Sistemas de archivos obtenidos",
+		Message: fmt.Sprintf("Encontrados %d sistemas de archivos", len(fileSystems)),
 		Data:    fileSystems,
 		Status:  "success",
 	})
@@ -307,6 +425,62 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// debugPathHandler para diagnosticar problemas de rutas
+func debugPathHandler(w http.ResponseWriter, r *http.Request) {
+	searchPath := r.URL.Query().Get("path")
+	if searchPath == "" {
+		searchPath = "./Discos"
+	}
+
+	debug := map[string]interface{}{
+		"requested_path": searchPath,
+		"cleaned_path":   filepath.Clean(searchPath),
+	}
+
+	// Información del directorio actual
+	if wd, err := os.Getwd(); err == nil {
+		debug["working_directory"] = wd
+	}
+
+	// Verificar si existe
+	if stat, err := os.Stat(searchPath); err == nil {
+		debug["path_exists"] = true
+		debug["is_directory"] = stat.IsDir()
+		debug["size"] = stat.Size()
+		debug["permissions"] = stat.Mode().String()
+	} else {
+		debug["path_exists"] = false
+		debug["error"] = err.Error()
+	}
+
+	// Listar contenido si es directorio
+	if entries, err := os.ReadDir(searchPath); err == nil {
+		var files []string
+		for _, entry := range entries {
+			files = append(files, entry.Name())
+		}
+		debug["directory_contents"] = files
+	}
+
+	// Probar patrones de búsqueda
+	patterns := []string{"*.mia", "*.dsk", "*"}
+	for _, pattern := range patterns {
+		fullPattern := filepath.Join(searchPath, pattern)
+		if matches, err := filepath.Glob(fullPattern); err == nil {
+			debug[fmt.Sprintf("pattern_%s", pattern)] = matches
+		} else {
+			debug[fmt.Sprintf("pattern_%s_error", pattern)] = err.Error()
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(ApiResponse{
+		Message: "Información de debug de ruta",
+		Data:    debug,
+		Status:  "success",
+	})
+}
+
 func main() {
 	// Crear router
 	router := mux.NewRouter()
@@ -320,17 +494,15 @@ func main() {
 	api.HandleFunc("/commands", getSupportedCommandsHandler).Methods("GET")
 
 	// Endpoints para comandos
-	api.HandleFunc("/validate", validateCommandHandler).Methods("POST")
 	api.HandleFunc("/execute", executeCommandHandler).Methods("POST")
+	api.HandleFunc("/validate", validateCommandHandler).Methods("POST")
 
 	// Endpoints para logs y comunicación en tiempo real
-	api.HandleFunc("/logs", utils.GetLogsHandler).Methods("GET")
-	api.HandleFunc("/logs/stream", utils.SSEHandler).Methods("GET")
-	router.HandleFunc("/ws", wsHandler).Methods("GET")
+	api.HandleFunc("/ws", wsHandler)
 
 	// Configurar CORS
 	c := cors.New(cors.Options{
-		AllowedOrigins:   []string{"http://localhost:3000", "http://127.0.0.1:3000", "*"},
+		AllowedOrigins:   []string{"http://localhost:3000"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"*"},
 		AllowCredentials: true,
@@ -340,51 +512,19 @@ func main() {
 	handler := c.Handler(router)
 
 	// Configurar servidor
-	port := ":8080"
+	server := &http.Server{
+		Addr:    ":8080",
+		Handler: handler,
+	}
 
 	// Mensaje de inicio
-	fmt.Println("🚀 ====================================")
-	fmt.Println("🚀    ExtreamFS Backend Server")
-	fmt.Println("🚀 ====================================")
-	fmt.Printf("🚀 Servidor iniciado en http://localhost%s\n", port)
-	fmt.Println("🚀 Proyecto: Simulador de Sistema de Archivos EXT2")
-	fmt.Println("🚀 Versión: 1.0.0")
-	fmt.Println("🚀")
-	fmt.Println("📡 Endpoints disponibles:")
-	fmt.Println("   GET  /api/health         - Estado del servidor")
-	fmt.Println("   GET  /api/filesystems    - Listar sistemas de archivos")
-	fmt.Println("   GET  /api/commands       - Comandos soportados")
-	fmt.Println("   POST /api/validate       - Validar sintaxis de comandos")
-	fmt.Println("   POST /api/execute        - Ejecutar comandos")
-	fmt.Println("   GET  /api/logs           - Obtener logs (polling)")
-	fmt.Println("   GET  /api/logs/stream    - Stream de logs (SSE)")
-	fmt.Println("   GET  /ws                 - WebSocket para logs en tiempo real")
-	fmt.Println("🚀")
-	fmt.Println("📝 Comandos implementados:")
-
-	commands := commandParser.GetSupportedCommands()
-	for i, cmd := range commands {
-		if i < 6 { // Mostrar solo los primeros comandos implementados
-			status := "✅"
-			if cmd == "mkdisk" || cmd == "rmdisk" {
-				status = "✅ IMPLEMENTADO"
-			} else {
-				status = "🚧 EN DESARROLLO"
-			}
-			fmt.Printf("   %-12s %s\n", cmd, status)
-		}
-	}
-	fmt.Printf("   %-12s %s\n", "...", fmt.Sprintf("y %d comandos más", len(commands)-6))
-
-	fmt.Println("🚀")
-	fmt.Println("🔧 Para probar el sistema:")
-	fmt.Println("   curl http://localhost:8080/api/health")
-	fmt.Println("🚀 ====================================")
+	fmt.Println("🚀 Servidor iniciado en http://localhost:8080")
+	fmt.Println("📡 API disponible en http://localhost:8080/api")
+	fmt.Println("🔗 WebSocket disponible en ws://localhost:8080/api/ws")
 
 	// Log inicial
-	utils.LogSuccess("SYSTEM", "ExtreamFS Backend iniciado correctamente")
-	utils.LogInfo("SYSTEM", fmt.Sprintf("Servidor escuchando en puerto %s", port))
+	utils.LogInfo("SERVER", "Backend del sistema de archivos ExtreamFS iniciado correctamente")
 
 	// Iniciar servidor
-	log.Fatal(http.ListenAndServe(port, handler))
+	log.Fatal(server.ListenAndServe())
 }

@@ -1,4 +1,12 @@
 # Proyecto MIA - Sistema de Archivos EXT2
+## 🆕 Cambios recientes (agosto 2025)
+- Documentación extendida de estructuras MBR, Partition y EBR en `docs/ESTRUCTURAS_GUIA.md`.
+- Detalle de nuevos métodos auxiliares en Go para serialización y manejo de discos.
+- Se agregó la sección de comandos en desarrollo y su estado en `docs/COMANDOS_IMPLEMENTADOS.md`.
+- Roadmap actualizado en `docs/ROADMAP.md`.
+- Mejoras en la integración de logs en tiempo real (WebSocket/SSE).
+- Validaciones y manejo de errores mejorados en backend.
+- Documentación técnica y de usuario ampliada.
 
 ## 📋 **Resumen del Proyecto**
 

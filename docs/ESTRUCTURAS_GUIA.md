@@ -1,4 +1,9 @@
 # 📚 Guía de Estructuras - Sistema de Archivos EXT2
+## 🆕 Cambios recientes (agosto 2025)
+- Estructura EBR documentada y en desarrollo.
+- Métodos recomendados para MBR y Partition agregados.
+- Ejemplo de uso completo de las estructuras en Go.
+- Sección de utilidades de serialización y acceso a disco.
 
 ## 🎯 **Objetivo**
 Esta guía define todas las estructuras de datos necesarias para implementar un simulador de sistema de archivos EXT2 compatible con el proyecto MIA.

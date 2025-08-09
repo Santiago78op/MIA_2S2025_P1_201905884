@@ -59,6 +59,7 @@ export interface FileSystemInfo {
   size: number;
   mountPoint: string;
   status?: 'mounted' | 'unmounted';
+  path?: string; // Nueva propiedad para la ruta completa
 }
 
 export interface CommandRequest {
@@ -75,8 +76,9 @@ class ApiService {
   }
 
   // Obtener sistemas de archivos (FUNCIONAL)
-  async getFileSystems(): Promise<ApiResponse<FileSystemInfo[]>> {
-    const response = await apiClient.get<ApiResponse<FileSystemInfo[]>>('/filesystems');
+  async getFileSystems(searchPath?: string): Promise<ApiResponse<FileSystemInfo[]>> {
+    const params = searchPath ? { path: searchPath } : {};
+    const response = await apiClient.get<ApiResponse<FileSystemInfo[]>>('/filesystems', { params });
     return response.data;
   }
 

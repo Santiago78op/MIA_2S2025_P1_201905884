@@ -68,25 +68,33 @@ export const useServerHealth = () => {
   };
 };
 
-// Hook para manejar sistemas de archivos
+// Hook para manejar sistemas de archivos con búsqueda
 export const useFileSystems = () => {
   const [fileSystems, setFileSystems] = useState<FileSystemInfo[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [currentPath, setCurrentPath] = useState<string>('/home/julian/Documents/MIA_2S2025_P1_201905884/backend/Discos/mis discos');
 
-  const fetchFileSystems = useCallback(async () => {
+  const fetchFileSystems = useCallback(async (searchPath?: string) => {
     try {
       setIsLoading(true);
       setError(null);
-      const response = await apiService.getFileSystems();
+      const pathToSearch = searchPath || currentPath;
+      console.log('Buscando en ruta:', pathToSearch); // Debug
+      const response = await apiService.getFileSystems(pathToSearch);
       setFileSystems(response.data || []);
+      if (searchPath) {
+        setCurrentPath(searchPath);
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al obtener sistemas de archivos');
+      const errorMessage = err instanceof Error ? err.message : 'Error al obtener sistemas de archivos';
+      console.error('Error en fetchFileSystems:', errorMessage); // Debug
+      setError(errorMessage);
       setFileSystems([]);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [currentPath]);
 
   useEffect(() => {
     fetchFileSystems();
@@ -96,7 +104,9 @@ export const useFileSystems = () => {
     fileSystems,
     isLoading,
     error,
+    currentPath,
     refetch: fetchFileSystems,
+    searchByPath: (path: string) => fetchFileSystems(path),
   };
 };
 

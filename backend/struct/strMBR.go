@@ -278,9 +278,31 @@ func (m *MBR) FindBestFitPosition(size int64) (int64, error) {
 }
 
 // FreeSpace representa un espacio libre en el disco
+// Esta estructura debe agregarse al archivo strMBR.go antes de la función getFreeSpaces
 type FreeSpace struct {
-	Start int64
-	Size  int64
+	Start int64 // Posición de inicio del espacio libre
+	Size  int64 // Tamaño del espacio libre en bytes
+}
+
+// String implementa la interfaz Stringer para debugging
+func (fs FreeSpace) String() string {
+	return fmt.Sprintf("FreeSpace{Start: %d, Size: %d, End: %d}",
+		fs.Start, fs.Size, fs.Start+fs.Size)
+}
+
+// Contains verifica si una posición está dentro del espacio libre
+func (fs FreeSpace) Contains(position int64) bool {
+	return position >= fs.Start && position < fs.Start+fs.Size
+}
+
+// CanFit verifica si un tamaño específico cabe en este espacio libre
+func (fs FreeSpace) CanFit(size int64) bool {
+	return fs.Size >= size
+}
+
+// GetEndPosition obtiene la posición final del espacio libre
+func (fs FreeSpace) GetEndPosition() int64 {
+	return fs.Start + fs.Size
 }
 
 // getFreeSpaces obtiene todos los espacios libres en el disco

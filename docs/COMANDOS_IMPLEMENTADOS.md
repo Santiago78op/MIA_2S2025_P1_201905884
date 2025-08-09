@@ -1,4 +1,9 @@
 # 🛠️ Comandos Implementados - Sistema de Archivos
+## 🆕 Cambios recientes (agosto 2025)
+- Se documenta el proceso interno de `mkdisk` y sus validaciones.
+- Se agregan ejemplos de logs generados por comandos.
+- Se detallan las estructuras MBR y Partition utilizadas.
+- Se actualiza el roadmap de comandos y fases de desarrollo.
 
 ## 📋 **Resumen**
 Documentación detallada de todos los comandos implementados en el simulador de sistema de archivos EXT2.
