@@ -10,7 +10,6 @@ package utils
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"sync"
@@ -82,12 +81,12 @@ func (l *LogMessage) Log() {
 	// Imprimir en consola
 	fmt.Println(formattedMessage)
 
-	// Enviar a todas las conexiones WebSocket activas
+	// Enviar a todas las conexiones WebSocket activas como JSON
 	connectionsMutex.Lock()
 	defer connectionsMutex.Unlock()
 
 	for _, conn := range wsConnections {
-		if err := conn.WriteMessage(websocket.TextMessage, []byte(formattedMessage)); err != nil {
+		if err := conn.WriteJSON(*l); err != nil {
 			fmt.Printf("Error al enviar mensaje a WebSocket: %v\n", err)
 		}
 	}
@@ -128,21 +127,18 @@ func openLogFile() (*os.File, error) {
 func LogInfo(comando, mensaje string) {
 	logger := NewLogger(INFO, comando, mensaje)
 	logger.Log()
-	sendToFrontend(*logger) // Enviar información al frontend
 }
 
 // LogWarning registra un mensaje de advertencia
 func LogWarning(comando, mensaje string) {
 	logger := NewLogger(WARNING, comando, mensaje)
 	logger.Log()
-	sendToFrontend(*logger) // Enviar advertencia al frontend
 }
 
 // LogError registra un mensaje de error
 func LogError(comando, mensaje string) {
 	logger := NewLogger(ERROR, comando, mensaje)
 	logger.Log()
-	sendToFrontend(*logger) // Enviar error al frontend
 	logToFile(fmt.Sprintf("ERROR: %s - %s", comando, mensaje))
 }
 
@@ -150,20 +146,8 @@ func LogError(comando, mensaje string) {
 func LogSuccess(comando, mensaje string) {
 	logger := NewLogger(SUCCESS, comando, mensaje)
 	logger.Log()
-	sendToFrontend(*logger)
 }
 
-// sendToFrontend envía un mensaje de registro al frontend a través de WebSocket
-func sendToFrontend(msg LogMessage) {
-	connectionsMutex.RLock()
-	defer connectionsMutex.RUnlock()
-
-	for _, conn := range wsConnections {
-		if err := conn.WriteJSON(msg); err != nil {
-			log.Printf("Error enviando mensaje por WebSocket: %v", err)
-		}
-	}
-}
 
 // SSEHandler maneja las conexiones Server-Sent Events para logs en tiempo real
 func SSEHandler(w http.ResponseWriter, r *http.Request) {
