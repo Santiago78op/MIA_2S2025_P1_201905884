@@ -86,6 +86,7 @@ func ShowMountedPartitions() string {
 	}
 
 	utils.LogSuccess("MOUNTED", fmt.Sprintf("Se mostraron %d particiones montadas", len(partitions)))
+	utils.LogInfo("MOUNTED", result.String())
 	return result.String()
 }
 

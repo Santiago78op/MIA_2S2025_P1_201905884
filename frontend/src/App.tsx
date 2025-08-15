@@ -24,6 +24,7 @@ function App() {
     maxLogs: 1000
   });
 
+
   // Manejar comando ejecutado desde terminal
   const handleCommandExecuted = useCallback((command: string, result: any) => {
     addLog('SUCCESS', 'TERMINAL', `Comando ejecutado: ${command}`, result);
@@ -43,6 +44,7 @@ function App() {
   const toggleLayout = () => {
     setLayout(prev => prev === 'horizontal' ? 'vertical' : 'horizontal');
   };
+
 
   return (
     <div className="App">
@@ -172,6 +174,7 @@ function App() {
       >
         {activeView === 'classic' ? '📟' : '🖥️'}
       </button>
+
     </div>
   );
 }

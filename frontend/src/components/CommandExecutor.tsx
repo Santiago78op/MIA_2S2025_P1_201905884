@@ -29,7 +29,8 @@ const CommandExecutor: React.FC = () => {
     const validation = validateAndFormatCommand(command);
     
     if (!validation.isValid) {
-      setValidationError(validation.errors.join(', '));
+      const errorMessage = validation.errors.join(', ');
+      setValidationError(errorMessage);
       return;
     }
 
@@ -37,8 +38,9 @@ const CommandExecutor: React.FC = () => {
       await executeCommand(validation.formattedCommand);
       setCommand(''); // Limpiar comando después de ejecutar
       setValidationError(null);
-    } catch (err) {
-      // Error ya manejado en el hook
+    } catch (err: any) {
+      // El error ya se maneja en useCommandExecution
+      console.error('Error ejecutando comando:', err);
     }
   };
 
@@ -106,10 +108,11 @@ const CommandExecutor: React.FC = () => {
         const validation = validateAndFormatCommand(command);
         
         if (!validation.isValid) {
+          const errorMessage = `Error de validación: ${validation.errors.join(', ')}`;
           results.push({
             command: command,
             success: false,
-            message: `Error de validación: ${validation.errors.join(', ')}`
+            message: errorMessage
           });
           continue;
         }
@@ -124,11 +127,12 @@ const CommandExecutor: React.FC = () => {
 
         await new Promise(resolve => setTimeout(resolve, 500));
         
-      } catch (error) {
+      } catch (error: any) {
+        const errorMessage = error.message || 'Error desconocido';
         results.push({
           command: command,
           success: false,
-          message: error instanceof Error ? error.message : 'Error desconocido'
+          message: errorMessage
         });
       }
 
@@ -136,6 +140,12 @@ const CommandExecutor: React.FC = () => {
     }
 
     setIsExecutingScript(false);
+    
+    // Resumen de ejecución del script
+    const successCount = results.filter(r => r.success).length;
+    const errorCount = results.filter(r => !r.success).length;
+    
+    console.log(`Script ejecutado: ${successCount} exitosos, ${errorCount} errores`);
   };
 
   // Descargar script de ejemplo

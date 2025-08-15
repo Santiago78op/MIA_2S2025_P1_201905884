@@ -81,15 +81,29 @@ func (l *LogMessage) Log() {
 	// Imprimir en consola
 	fmt.Println(formattedMessage)
 
+	// Debug: Mostrar cuántas conexiones WebSocket hay activas
+	connectionsMutex.RLock()
+	connectionCount := len(wsConnections)
+	connectionsMutex.RUnlock()
+
+	fmt.Printf("DEBUG: Enviando mensaje a %d conexiones WebSocket\n", connectionCount)
+
 	// Enviar a todas las conexiones WebSocket activas como JSON
 	connectionsMutex.Lock()
 	defer connectionsMutex.Unlock()
 
+	var activeConnections []*websocket.Conn
 	for _, conn := range wsConnections {
 		if err := conn.WriteJSON(*l); err != nil {
 			fmt.Printf("Error al enviar mensaje a WebSocket: %v\n", err)
+			// No agregar conexiones con error a la lista activa
+		} else {
+			activeConnections = append(activeConnections, conn)
 		}
 	}
+
+	// Actualizar la lista solo con conexiones activas
+	wsConnections = activeConnections
 
 	// Registrar en un archivo de log (solo para errores)
 	if l.Type == ERROR {
@@ -147,7 +161,6 @@ func LogSuccess(comando, mensaje string) {
 	logger := NewLogger(SUCCESS, comando, mensaje)
 	logger.Log()
 }
-
 
 // SSEHandler maneja las conexiones Server-Sent Events para logs en tiempo real
 func SSEHandler(w http.ResponseWriter, r *http.Request) {

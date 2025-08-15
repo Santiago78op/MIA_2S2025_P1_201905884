@@ -110,11 +110,11 @@ export const useFileSystems = () => {
   };
 };
 
-// Hook para ejecutar comandos
+// Hook para ejecutar comandos con manejo mejorado de errores
 export const useCommandExecution = () => {
   const [isExecuting, setIsExecuting] = useState(false);
   const [lastResult, setLastResult] = useState<ApiResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<any | null>(null);
 
   const executeCommand = useCallback(async (command: string) => {
     try {
@@ -123,10 +123,20 @@ export const useCommandExecution = () => {
       const response = await apiService.executeCommand(command);
       setLastResult(response);
       return response;
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Error al ejecutar comando';
-      setError(errorMessage);
-      throw new Error(errorMessage);
+    } catch (err: any) {
+      // Preservar toda la información del error enriquecido
+      const enrichedError = {
+        message: err.message || 'Error al ejecutar comando',
+        title: err.title || 'Error',
+        code: err.code || 'UNKNOWN',
+        status: err.status,
+        suggestions: err.suggestions || [],
+        timestamp: err.timestamp || new Date().toISOString(),
+        originalError: err.originalError || err
+      };
+      
+      setError(enrichedError);
+      throw enrichedError;
     } finally {
       setIsExecuting(false);
     }

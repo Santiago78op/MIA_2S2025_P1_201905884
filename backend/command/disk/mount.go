@@ -53,7 +53,7 @@ func init() {
 		mountedPartitions:  make(map[string]*MountedPartition),
 		diskPartitionCount: make(map[string]int),
 		nextLetter:         'A',
-		carnetSuffix:       "34", // Últimos dos dígitos del carnet (ajustar según corresponda)
+		carnetSuffix:       "84", // Últimos dos dígitos del carnet (ajustar según corresponda)
 	}
 }
 
@@ -199,6 +199,10 @@ func findAndMountPartition(path, name string, mbr *estructuras.MBR) (*MountedPar
 				return nil, fmt.Errorf("solo se pueden montar particiones primarias")
 			}
 
+			// CALCULAR EL CORRELATIVO
+			diskKey := strconv.FormatInt(mbr.MbrDiskSignature, 10)
+			nextCorrelative := int64(mountSystem.diskPartitionCount[diskKey] + 1)
+
 			return &MountedPartition{
 				Name:           name,
 				Path:           path,
@@ -207,6 +211,7 @@ func findAndMountPartition(path, name string, mbr *estructuras.MBR) (*MountedPar
 				PartitionIndex: i,
 				EBRPosition:    -1, // No aplica para primarias
 				DiskSignature:  mbr.MbrDiskSignature,
+				Correlative:    nextCorrelative, // ✅ ASIGNAR EL CORRELATIVO
 				MountTime:      fmt.Sprintf("%d", time.Now().Unix()),
 			}, nil
 		}
@@ -245,25 +250,20 @@ func generatePartitionID(diskSignature int64) string {
 		count = 0
 	}
 
-	// Incrementar contador
+	// Incrementar contador (inicia en 1)
 	count++
 	mountSystem.diskPartitionCount[diskKey] = count
 
-	// Si es una partición del mismo disco, incrementar número
-	// Si es de otro disco, usar la siguiente letra y reiniciar en 1
-	if count == 1 {
-		// Primera partición de este disco, puede ser nueva letra
-		if len(mountSystem.diskPartitionCount) > 1 {
-			// Hay otros discos, usar siguiente letra
-			mountSystem.nextLetter++
-			if mountSystem.nextLetter > 'Z' {
-				mountSystem.nextLetter = 'A' // Reiniciar si se acaban las letras
-			}
-		}
-	}
-
-	// Generar ID: últimos 2 dígitos del carnet + número + letra
+	// ✅ FORMATO CORRECTO DEL ID: carnet + correlativo + letra
+	// Ejemplo: 34 (carnet) + 1 (correlativo) + A (letra) = 341A
 	id := fmt.Sprintf("%s%d%c", mountSystem.carnetSuffix, count, mountSystem.nextLetter)
+
+	// ✅ INCREMENTAR LA LETRA PARA EL SIGUIENTE DISCO
+	// Solo incrementar si es un disco diferente o cuando se agote el alfabeto
+	mountSystem.nextLetter++
+	if mountSystem.nextLetter > 'Z' {
+		mountSystem.nextLetter = 'A' // Reiniciar si se agota el alfabeto
+	}
 
 	utils.LogInfo("MOUNT", fmt.Sprintf("ID generado: %s para disco %d", id, diskSignature))
 	return id
@@ -281,57 +281,61 @@ func isPartitionAlreadyMounted(path, name string) bool {
 
 // updatePartitionInDisk actualiza la partición en el disco con información de montaje
 func updatePartitionInDisk(path, name string, mountedPartition *MountedPartition, mbr *estructuras.MBR) error {
-	// Encontrar la partición en el MBR
+	// ❌ ELIMINAR TODA LA ESCRITURA AL DISCO
+	// Solo mantener la lógica en memoria RAM
+
+	// Encontrar la partición en el MBR (solo en memoria)
 	for i := range mbr.MbrParticiones {
 		if mbr.MbrParticiones[i].IsActive() && mbr.MbrParticiones[i].GetName() == name {
-			// Asignar correlativo y ID
-			mbr.MbrParticiones[i].PartCorrelativo = int64(len(mountSystem.mountedPartitions) + 1)
+			// ✅ Actualizar estatus a 'M' (Montada)
+			mbr.MbrParticiones[i].PartStatus = 'M'
+
+			// ✅ Asignar correlativo correcto (inicia en 1)
+			mbr.MbrParticiones[i].PartCorrelativo = int64(mountedPartition.Correlative)
+
+			// ✅ Asignar ID generado
 			mbr.MbrParticiones[i].SetID(mountedPartition.ID)
 
-			// Actualizar la estructura montada
-			mountedPartition.Correlative = mbr.MbrParticiones[i].PartCorrelativo
+			// ❌ NO ESCRIBIR AL DISCO
+			// return estructuras.WriteToDisk(path, mbrData, 0)
 
-			// Escribir MBR actualizado
-			mbrData, err := estructuras.SerializeMBR(mbr)
-			if err != nil {
-				return fmt.Errorf("error al serializar MBR: %v", err)
-			}
-
-			return estructuras.WriteToDisk(path, mbrData, 0)
+			return nil // Solo operación en memoria
 		}
 	}
 
-	return fmt.Errorf("no se pudo actualizar la partición en el disco")
+	return fmt.Errorf("no se pudo actualizar la partición en memoria")
 }
 
-// unmountPartitionInDisk actualiza la partición en el disco para desmontar
+// unmountPartitionInDisk actualiza la partición para desmontar (solo en memoria)
 func unmountPartitionInDisk(mountedPartition *MountedPartition) error {
-	// Leer el MBR
+	// Solo operaciones en memoria RAM, no escribir al disco
+
+	// Leer el MBR (esto no escribe, solo lee)
 	mbr, err := estructuras.ReadMBR(mountedPartition.Path)
 	if err != nil {
 		return fmt.Errorf("error al leer MBR: %v", err)
 	}
 
-	// Encontrar y actualizar la partición
+	// Encontrar y actualizar la partición (solo en memoria)
 	for i := range mbr.MbrParticiones {
 		if mbr.MbrParticiones[i].IsActive() &&
 			mbr.MbrParticiones[i].GetName() == mountedPartition.Name {
+
+			// ✅ Cambiar estatus a no montada
+			mbr.MbrParticiones[i].PartStatus = 'U' // Unmounted o el valor por defecto
 
 			// Limpiar información de montaje
 			mbr.MbrParticiones[i].PartCorrelativo = -1
 			mbr.MbrParticiones[i].SetID("")
 
-			// Escribir MBR actualizado
-			mbrData, err := estructuras.SerializeMBR(mbr)
-			if err != nil {
-				return fmt.Errorf("error al serializar MBR: %v", err)
-			}
+			// ❌ NO ESCRIBIR AL DISCO
+			// return estructuras.WriteToDisk(mountedPartition.Path, mbrData, 0)
 
-			return estructuras.WriteToDisk(mountedPartition.Path, mbrData, 0)
+			return nil // Solo operación en memoria
 		}
 	}
 
-	return fmt.Errorf("no se pudo actualizar la partición en el disco")
+	return fmt.Errorf("no se pudo actualizar la partición en memoria")
 }
 
 // GetMountSystemStats retorna estadísticas del sistema de montaje
@@ -373,4 +377,23 @@ func ClearMountSystem() {
 	mountSystem.nextLetter = 'A'
 
 	utils.LogInfo("MOUNT", "Sistema de montaje limpiado")
+}
+
+// ListMountedPartitions lista todas las particiones montadas
+func ListMountedPartitions() {
+	mountSystem.mutex.RLock()
+	defer mountSystem.mutex.RUnlock()
+
+	if len(mountSystem.mountedPartitions) == 0 {
+		utils.LogInfo("MOUNT", "No hay particiones montadas")
+		return
+	}
+
+	utils.LogInfo("MOUNT", "Particiones montadas:")
+	for id, partition := range mountSystem.mountedPartitions {
+		utils.LogInfo("MOUNT", fmt.Sprintf("  → ID: %s | Nombre: %s | Tipo: %s | Tamaño: %d bytes",
+			id, partition.Name, partition.Type, partition.Size))
+		utils.LogInfo("MOUNT", fmt.Sprintf("      Disco: %s | Correlativo: %d",
+			partition.Path, partition.Correlative))
+	}
 }

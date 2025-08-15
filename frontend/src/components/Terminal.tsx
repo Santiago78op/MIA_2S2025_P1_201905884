@@ -327,7 +327,6 @@ Ejemplo: mkdisk -size=1000 -unit=M -path="/home/disk1.mia"`;
               autoComplete="off"
               spellCheck="false"
             />
-            {isExecuting && <span className="terminal-spinner">⏳</span>}
           </div>
         </div>
 

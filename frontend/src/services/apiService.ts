@@ -17,24 +17,117 @@ apiClient.interceptors.response.use(
   (error) => {
     console.error('Error en API:', error.response?.data || error.message);
     
-    // Manejar diferentes tipos de errores
-    if (error.code === 'ECONNREFUSED') {
-      throw new Error('No se puede conectar al servidor. Verifique que el backend esté ejecutándose.');
+    let errorMessage = 'Error desconocido';
+    let errorTitle = 'Error';
+    let errorCode = 'UNKNOWN';
+    
+    // Manejar diferentes tipos de errores de red
+    if (error.code === 'ECONNREFUSED' || error.code === 'ERR_NETWORK') {
+      errorMessage = 'No se puede conectar al servidor. Verifique que el backend esté ejecutándose en el puerto 8080.';
+      errorTitle = 'Error de Conexión';
+      errorCode = 'CONNECTION_REFUSED';
+    } else if (error.code === 'ECONNABORTED') {
+      errorMessage = 'La solicitud tardó demasiado tiempo. Intente nuevamente.';
+      errorTitle = 'Tiempo de Espera Agotado';
+      errorCode = 'TIMEOUT';
+    } else if (error.response) {
+      // Errores con respuesta del servidor
+      const status = error.response.status;
+      const responseData = error.response.data;
+      
+      switch (status) {
+        case 400:
+          errorMessage = responseData?.message || responseData?.error || 'Solicitud incorrecta. Verifique los parámetros del comando.';
+          errorTitle = 'Error de Validación';
+          errorCode = 'BAD_REQUEST';
+          break;
+        case 401:
+          errorMessage = 'No autorizado. Verifique sus credenciales.';
+          errorTitle = 'Error de Autenticación';
+          errorCode = 'UNAUTHORIZED';
+          break;
+        case 403:
+          errorMessage = 'Acceso denegado. No tiene permisos para realizar esta acción.';
+          errorTitle = 'Acceso Denegado';
+          errorCode = 'FORBIDDEN';
+          break;
+        case 404:
+          errorMessage = responseData?.message || 'Recurso no encontrado. Verifique la ruta o el comando.';
+          errorTitle = 'No Encontrado';
+          errorCode = 'NOT_FOUND';
+          break;
+        case 422:
+          errorMessage = responseData?.message || 'Datos no válidos. Revise el formato del comando.';
+          errorTitle = 'Error de Procesamiento';
+          errorCode = 'UNPROCESSABLE_ENTITY';
+          break;
+        case 429:
+          errorMessage = 'Demasiadas solicitudes. Espere un momento antes de intentar nuevamente.';
+          errorTitle = 'Límite Excedido';
+          errorCode = 'RATE_LIMIT';
+          break;
+        case 500:
+          errorMessage = responseData?.message || 'Error interno del servidor. Contacte al administrador.';
+          errorTitle = 'Error del Servidor';
+          errorCode = 'INTERNAL_SERVER_ERROR';
+          break;
+        case 502:
+          errorMessage = 'Servidor no disponible temporalmente. Intente más tarde.';
+          errorTitle = 'Servidor No Disponible';
+          errorCode = 'BAD_GATEWAY';
+          break;
+        case 503:
+          errorMessage = 'Servicio temporalmente no disponible. Intente más tarde.';
+          errorTitle = 'Servicio No Disponible';
+          errorCode = 'SERVICE_UNAVAILABLE';
+          break;
+        default:
+          errorMessage = responseData?.message || `Error HTTP ${status}: ${error.response.statusText}`;
+          errorTitle = 'Error del Servidor';
+          errorCode = `HTTP_${status}`;
+      }
+    } else if (error.request) {
+      // Error en la solicitud sin respuesta
+      errorMessage = 'No se recibió respuesta del servidor. Verifique su conexión a internet.';
+      errorTitle = 'Error de Red';
+      errorCode = 'NO_RESPONSE';
     }
     
-    if (error.response?.status === 400) {
-      throw new Error(error.response.data?.message || 'Comando inválido');
+    // Crear error enriquecido con información adicional
+    const enrichedError = new Error(errorMessage);
+    (enrichedError as any).title = errorTitle;
+    (enrichedError as any).code = errorCode;
+    (enrichedError as any).status = error.response?.status;
+    (enrichedError as any).originalError = error;
+    (enrichedError as any).timestamp = new Date().toISOString();
+    
+    // Agregar sugerencias basadas en el tipo de error
+    const suggestions: string[] = [];
+    
+    switch (errorCode) {
+      case 'CONNECTION_REFUSED':
+        suggestions.push('Verifique que el backend esté ejecutándose');
+        suggestions.push('Confirme que el puerto 8080 esté disponible');
+        suggestions.push('Reinicie el servidor backend');
+        break;
+      case 'BAD_REQUEST':
+        suggestions.push('Revise la sintaxis del comando');
+        suggestions.push('Verifique los parámetros requeridos');
+        suggestions.push('Consulte la ayuda del comando');
+        break;
+      case 'NOT_FOUND':
+        suggestions.push('Verifique que la ruta del archivo exista');
+        suggestions.push('Confirme que el comando esté implementado');
+        break;
+      case 'TIMEOUT':
+        suggestions.push('Intente con un comando más simple');
+        suggestions.push('Verifique la conexión de red');
+        break;
     }
     
-    if (error.response?.status === 500) {
-      throw new Error(error.response.data?.message || 'Error interno del servidor');
-    }
+    (enrichedError as any).suggestions = suggestions;
     
-    if (error.response?.status === 404) {
-      throw new Error('Endpoint no encontrado');
-    }
-    
-    return Promise.reject(error);
+    return Promise.reject(enrichedError);
   }
 );
 

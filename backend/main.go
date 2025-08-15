@@ -23,7 +23,7 @@ import (
 // ConfigureCarnet configura el sufijo del carnet para generar IDs de particiones
 func ConfigureCarnet() {
 	// Intentar obtener el carnet de argumentos de línea de comandos
-	carnet := flag.String("carnet", "", "Número de carnet completo (ej: 202401234)")
+	carnet := flag.String("carnet", "", "Número de carnet completo (ej: 201905884)")
 	flag.Parse()
 
 	var suffix string
@@ -48,11 +48,11 @@ func ConfigureCarnet() {
 			diskCommands.SetCarnetSuffix(suffix)
 			fmt.Printf("✅ Carnet configurado: IDs de partición usarán el sufijo '%s'\n", suffix)
 		} else {
-			fmt.Printf("⚠️  Carnet inválido, usando sufijo por defecto '34'\n")
+			fmt.Printf("⚠️  Carnet inválido, usando sufijo por defecto '84'\n")
 		}
 	} else {
-		fmt.Printf("ℹ️  No se especificó carnet, usando sufijo por defecto '34'\n")
-		fmt.Printf("   Para configurar: -carnet=202401234 o export STUDENT_CARNET=202401234\n")
+		fmt.Printf("ℹ️  No se especificó carnet, usando sufijo por defecto '84'\n")
+		fmt.Printf("   Para configurar: -carnet=201905884 o export STUDENT_CARNET=201905884\n")
 	}
 }
 
@@ -317,6 +317,17 @@ func executeCommandHandler(w http.ResponseWriter, r *http.Request) {
 		utils.LogInfo("API", fmt.Sprintf("Ejecutando comando único: %s", requestData.Command))
 		result := commandParser.ParseAndExecute(requestData.Command)
 		results = append(results, *result)
+		
+		// Para comandos únicos, si falla, retornar error HTTP
+		if !result.Success {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(ApiResponse{
+				Message: result.Error,
+				Status:  "error",
+			})
+			return
+		}
 	} else if requestData.Script != "" {
 		// Ejecutar script
 		utils.LogInfo("API", "Ejecutando script con múltiples comandos")
